@@ -1,0 +1,43 @@
+# Vivado local state and generated project data
+.Xil/
+*.cache/
+*.gen/
+*.hw/
+*.ip_user_files/
+*.runs/
+*.sim/
+
+# Vivado logs, journals, reports, and databases
+*.jou
+*.log
+*.str
+*.pb
+*.rpt
+*.rpx
+*.dcp
+*.wdb
+*.vcd
+*.saif
+
+# Generated programming files
+*.bit
+*.bin
+*.ltx
+*.mmi
+
+# Temporary and backup files
+*.tmp
+*.temp
+*.bak
+*.backup.*
+*~
+
+# OS and editor metadata
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
+
+# Keep reproducible design inputs in Git, including:
+#   *.v, *.sv, *.vhd, *.xdc, *.tcl, *.xci, *.bd, *.coe, and *.xpr
