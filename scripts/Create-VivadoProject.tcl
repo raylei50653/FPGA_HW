@@ -2,7 +2,9 @@
 # Usage: vivado -mode batch -source scripts/Create-VivadoProject.tcl -tclargs HW1
 
 set repo_root [file normalize [file join [file dirname [info script]] ..]]
-set homework [lindex $argv 0]
+if {![info exists homework]} {
+    set homework [lindex $argv 0]
+}
 if {$homework eq ""} {
     set homework HW1
 }

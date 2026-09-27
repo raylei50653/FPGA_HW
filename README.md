@@ -1,8 +1,8 @@
 # FPGA 作業
 
-本儲存庫以作業編號管理 Vivado 原始碼。現有 VHDL 檔案來自
-`D:\Documents\vivado_2\project_1`（Vivado 2018.3）。往後請修改本儲存庫中的檔案，
-避免與原專案各自維護一份。
+本儲存庫以作業編號管理 Vivado 原始碼。舊專案
+`D:\Documents\vivado_2\project_1`（Vivado 2018.3）是持續匯入的來源；
+每次在舊專案修改檔案後，執行對應作業的匯入腳本，再檢查與提交 Git 變更。
 
 ## 目錄結構
 
@@ -10,28 +10,45 @@
 HW<n>/
 ├── src/          可綜合的設計原始碼
 ├── sim/          模擬測試檔
-└── constraints/  約束檔（需要時建立）
-scripts/          建立 Vivado 專案的 Tcl 腳本
+├── constraints/  約束檔（需要時建立）
+├── Import-FromVivado.ps1  從舊專案匯入該作業檔案
+├── Create-Project.tcl     由 Git 原始碼建立該作業專案
+└── README.md              該作業的操作說明
+scripts/          共用腳本
 vivado/           本機產生的專案，Git 不追蹤
 ```
 
 `<n>` 是作業編號，例如 `HW1`。新增作業時依照相同結構建立 `HW<n>/`；
 每份作業會產生獨立的 Vivado 專案。
 
+## 從舊專案匯入
+
+以下以 HW1 為例，在儲存庫根目錄的 PowerShell 執行：
+
+```powershell
+.\HW1\Import-FromVivado.ps1
+git diff -- HW1
+```
+
+腳本會掃描舊專案的 `project_1.srcs`，依檔名中的作業編號將 HDL 與 XDC
+檔案複製到該作業目錄；模擬檔放在 `sim/`，約束檔放在 `constraints/`。
+內容相同的檔案會略過；若同名檔案內容不同，腳本會停止。確認要以舊專案
+版本更新 Git 檔案時，重新執行並加上 `-Update`。匯入不會刪除 Git 中的檔案，
+也不會修改舊專案。IP、block design 等複合檔案，以及器件、Top 等專案設定，
+不會由此腳本同步；變更這些內容時需另行更新建立腳本。
+
 ## 建立與開啟專案
 
 以下以 HW1 為例，在 PowerShell 執行：
 
 ```powershell
-& 'C:\Xilinx\Vivado\2018.3\bin\vivado.bat' -mode batch -source .\scripts\Create-VivadoProject.tcl -tclargs HW1
+& 'C:\Xilinx\Vivado\2018.3\bin\vivado.bat' -mode batch -source .\HW1\Create-Project.tcl
 & 'C:\Xilinx\Vivado\2018.3\bin\vivado.bat' .\vivado\HW1\HW1.xpr
 ```
 
 建立其他作業時，將指令中的 `HW1` 換成對應的 `HW<n>`。腳本使用相對於自身位置的
-路徑，因此可從其他工作目錄執行；產生的專案會直接引用本儲存庫的原始碼。
+路徑，因此可從其他工作目錄執行；產生的專案會直接引用已匯入本儲存庫的原始碼。
 目前 HW2 只有測試檔，須先將設計原始碼放入 `HW2/src/`，才能建立 HW2 專案。
 
-新增 RTL、測試檔、約束檔或 IP 設定檔時，請放在對應的作業目錄。
-透過 Vivado 介面加入檔案時，不要勾選複製到專案的選項。
-若新檔案類型未被建立腳本涵蓋，需同步修改腳本。`vivado/`、編譯結果、
+若新檔案類型未被匯入或建立腳本涵蓋，需同步修改共用腳本。`vivado/`、編譯結果、
 紀錄、波形及 bitstream 均不納入 Git。
