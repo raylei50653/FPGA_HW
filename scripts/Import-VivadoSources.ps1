@@ -12,7 +12,11 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 $projectRoot = (Resolve-Path -LiteralPath $VivadoProjectPath).Path
-$projectName = Split-Path -Leaf $projectRoot
+$projectFiles = @(Get-ChildItem -LiteralPath $projectRoot -Filter '*.xpr' -File)
+if ($projectFiles.Count -ne 1) {
+    throw "來源目錄必須包含一個 Vivado .xpr 專案檔：$projectRoot"
+}
+$projectName = $projectFiles[0].BaseName
 $sourceRoot = Join-Path $projectRoot "$projectName.srcs"
 if (-not (Test-Path -LiteralPath $sourceRoot -PathType Container)) {
     throw "找不到 Vivado 原始碼目錄：$sourceRoot"
