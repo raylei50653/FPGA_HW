@@ -1,8 +1,7 @@
 # HW2
 
-- `src/`: synthesizable design sources.
-- `sim/HW_2_tb.vhd`: Vivado simulation testbench.
+- `src/`：可綜合的設計原始碼，目前尚未加入。
+- `sim/HW_2_tb.vhd`：Vivado 模擬測試檔。
 
-The original Vivado project directory contains the HW2 testbench file, but its
-project configuration does not include it. Add the HW2 design source to `src/`
-before creating a separate HW2 Vivado project.
+原始 Vivado 專案目錄中雖有 HW2 測試檔，但專案設定尚未納入該檔。
+請先將 HW2 設計原始碼放入 `src/`，再建立獨立的 HW2 專案。

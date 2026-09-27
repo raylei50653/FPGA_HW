@@ -1,7 +1,6 @@
 # HW1
 
-- `src/HW_1.vhd`: synthesizable design source.
-- `sim/HW_1_tb.vhd`: Vivado simulation testbench.
+- `src/HW_1.vhd`：可綜合的設計原始碼。
+- `sim/HW_1_tb.vhd`：Vivado 模擬測試檔。
 
-These are the version-controlled source files for HW1. Create the Vivado project
-with `../scripts/Create-VivadoProject.tcl` as described in the repository README.
+以上檔案由 Git 管理。建立 Vivado 專案的指令請見根目錄的 README。
