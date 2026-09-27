@@ -1,5 +1,6 @@
 # Vivado local state and generated project data
 .Xil/
+/vivado/
 *.cache/
 *.gen/
 *.hw/
@@ -39,5 +40,4 @@ desktop.ini
 .vscode/
 .idea/
 
-# Keep reproducible design inputs in Git, including:
-#   *.v, *.sv, *.vhd, *.xdc, *.tcl, *.xci, *.bd, *.coe, and *.xpr
+# Keep source files, constraints, IP definitions, and project scripts in Git.
