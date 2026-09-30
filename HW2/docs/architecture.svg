@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1110 520" width="1110" height="520" role="img" aria-label="HW2 RGB 呼吸燈架構圖">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 680" width="1280" height="680" role="img" aria-label="HW2 RGB 呼吸燈架構圖：各 process 功能">
   <style>
     .box { fill: #f6f8fa; stroke: #8c959f; stroke-width: 1.2; }
     .io  { fill: #ddf4ff; stroke: #54aeff; stroke-width: 1.2; }
@@ -25,99 +25,116 @@
 
   <!-- 連線 -->
   <g class="e" marker-end="url(#a)">
-    <!-- 按鈕 -> 按鈕介面 -->
-    <path d="M130 36 H170"/>
-    <path d="M130 78 H170"/>
-    <path d="M130 120 H170"/>
-    <!-- 按鈕介面 -> 設定暫存器 -> status -->
-    <path d="M320 78 H410"/>
-    <path d="M600 78 H990"/>
-    <!-- 設定 -> 亮度 FSM / 顏色控制 -->
-    <path d="M450 106 V150 H245 V180"/>
-    <path d="M560 106 V180"/>
-    <!-- 亮度 FSM -> 顏色控制 / 混合 -->
-    <path d="M320 208 H410"/>
-    <path d="M290 236 V328 H410"/>
-    <!-- 顏色控制 -> 混合 -> Gamma -> duty -> LED -->
-    <path d="M505 236 V300"/>
-    <path d="M600 328 H640"/>
-    <path d="M770 328 H810"/>
-    <path d="M960 328 H990"/>
-    <!-- clk -> PWM / 1 ms 節拍 -->
-    <path d="M130 448 H170"/>
-    <path d="M75 428 V236"/>
-    <!-- 1 ms 節拍 -> 按鈕介面 -->
-    <path d="M100 180 V152 H190 V126"/>
-    <!-- PWM -> 亮度 FSM / duty 影子暫存器 -->
-    <path d="M210 420 V236"/>
-    <path d="M320 448 H885 V356"/>
+    <!-- 按鈕 -> ④ -->
+    <path d="M130 46 H170"/>
+    <path d="M130 88 H170"/>
+    <path d="M130 130 H170"/>
+    <!-- ④ -> ⑤ -> status -->
+    <path d="M390 88 H480"/>
+    <path d="M680 88 H1160"/>
+    <!-- ⑤ -> ② / ⑥ -->
+    <path d="M510 126 V190 H330 V230"/>
+    <path d="M620 126 V230"/>
+    <!-- ③ -> ④ -->
+    <path d="M85 200 V180 H250 V160"/>
+    <!-- ② -> ⑥ / ⑦ -->
+    <path d="M440 260 H520"/>
+    <path d="M320 340 V445 H360"/>
+    <!-- ⑥ -> ⑦ -->
+    <path d="M645 340 V410"/>
+    <!-- ⑦ -> ⑧ -> LED -->
+    <path d="M920 445 H960"/>
+    <path d="M1130 445 H1160"/>
+    <!-- clk -> ① / ③ -->
+    <path d="M150 585 H190"/>
+    <path d="M85 565 V260"/>
+    <!-- ① -> ② / ⑦ / ⑧ -->
+    <path d="M250 550 V340"/>
+    <path d="M410 570 H845 V480"/>
+    <path d="M410 600 H1045 V480"/>
   </g>
 
   <!-- 連線標籤 -->
-  <text class="l" x="365" y="70" text-anchor="middle">short / long</text>
-  <text class="l" x="795" y="70" text-anchor="middle">breath_en · hold_sel · mode</text>
-  <text class="l" x="795" y="94" text-anchor="middle">status(4) · (3:2) · (1:0)</text>
-  <text class="l" x="345" y="144" text-anchor="middle">hold_sel · breath_en</text>
-  <text class="l" x="568" y="148">mode</text>
-  <text class="l" x="112" y="168">tick_1ms</text>
-  <text class="l" x="365" y="200" text-anchor="middle">cycle_end</text>
-  <text class="l" x="350" y="320" text-anchor="middle">level</text>
-  <text class="l" x="513" y="272">RGB</text>
-  <text class="l" x="790" y="320" text-anchor="middle">duty</text>
-  <text class="l" x="202" y="330" text-anchor="end">pwm_end</text>
-  <text class="l" x="600" y="440" text-anchor="middle">pwm_cnt · pwm_end</text>
+  <text class="l" x="435" y="78" text-anchor="middle">短按 / 長按</text>
+  <text class="l" x="920" y="80" text-anchor="middle">目前設定</text>
+  <text class="l" x="420" y="184" text-anchor="middle">停留佔比 · 呼吸開關</text>
+  <text class="l" x="628" y="176">顏色模式</text>
+  <text class="l" x="160" y="174">1 ms 節拍</text>
+  <text class="l" x="480" y="252" text-anchor="middle">週期結束</text>
+  <text class="l" x="328" y="400">亮度</text>
+  <text class="l" x="653" y="380">顏色 C</text>
+  <text class="l" x="940" y="437" text-anchor="middle">duty</text>
+  <text class="l" x="242" y="400" text-anchor="end">週期結束點</text>
+  <text class="l" x="600" y="562" text-anchor="middle">週期結束點（duty 更新時機）</text>
+  <text class="l" x="700" y="592" text-anchor="middle">計數值</text>
 
   <!-- 輸入 / 輸出 -->
-  <rect class="io" x="20" y="20" width="110" height="32" rx="16"/>
-  <text class="p" x="75" y="41">btn_mode</text>
-  <rect class="io" x="20" y="62" width="110" height="32" rx="16"/>
-  <text class="p" x="75" y="83">btn_hold</text>
-  <rect class="io" x="20" y="104" width="110" height="32" rx="16"/>
-  <text class="p" x="75" y="125">btn_breath</text>
-  <rect class="io" x="20" y="428" width="110" height="40" rx="20"/>
-  <text class="p" x="75" y="453">clk / reset</text>
-  <rect class="io" x="990" y="58" width="100" height="40" rx="20"/>
-  <text class="p" x="1040" y="83">status</text>
-  <rect class="io" x="990" y="308" width="100" height="40" rx="20"/>
-  <text class="p" x="1040" y="333">led_r/g/b</text>
+  <rect class="io" x="20" y="30" width="110" height="32" rx="16"/>
+  <text class="p" x="75" y="51">btn_mode</text>
+  <rect class="io" x="20" y="72" width="110" height="32" rx="16"/>
+  <text class="p" x="75" y="93">btn_hold</text>
+  <rect class="io" x="20" y="114" width="110" height="32" rx="16"/>
+  <text class="p" x="75" y="135">btn_breath</text>
+  <rect class="io" x="20" y="565" width="130" height="40" rx="20"/>
+  <text class="p" x="85" y="590">clk / reset</text>
+  <rect class="io" x="1160" y="68" width="100" height="40" rx="20"/>
+  <text class="p" x="1210" y="93">status</text>
+  <rect class="io" x="1160" y="425" width="100" height="40" rx="20"/>
+  <text class="p" x="1210" y="450">led_r/g/b</text>
 
-  <!-- 控制路徑 -->
-  <rect class="box" x="20" y="180" width="110" height="56" rx="6"/>
-  <text class="t" x="75" y="203">1 ms 節拍</text>
-  <text class="s" x="75" y="222">÷100,000</text>
+  <!-- ③ 1 ms 節拍 -->
+  <rect class="box" x="20" y="200" width="130" height="60" rx="6"/>
+  <text class="t" x="85" y="224">③ 1 ms 節拍</text>
+  <text class="s" x="85" y="244">按鈕計時的時間基準</text>
 
-  <rect class="box" x="170" y="30" width="150" height="96" rx="6"/>
-  <text class="t" x="245" y="72">按鈕介面 ×3</text>
-  <text class="s" x="245" y="92">同步 · 去彈跳 · 短/長按</text>
+  <!-- ④ 按鈕介面 -->
+  <rect class="box" x="170" y="30" width="220" height="130" rx="6"/>
+  <text class="t" x="280" y="54">④ 按鈕介面 ×3</text>
+  <text class="s" x="280" y="80">同步：消除亞穩態、統一極性</text>
+  <text class="s" x="280" y="100">去彈跳：穩定 20 ms 才接受</text>
+  <text class="s" x="280" y="120">放開 = 短按</text>
+  <text class="s" x="280" y="140">按滿 1 s = 長按</text>
 
-  <rect class="box" x="410" y="50" width="190" height="56" rx="6"/>
-  <text class="t" x="505" y="73">設定暫存器</text>
-  <text class="s" x="505" y="92">mode · hold_sel · breath_en</text>
+  <!-- ⑤ 設定暫存器 -->
+  <rect class="box" x="480" y="50" width="200" height="76" rx="6"/>
+  <text class="t" x="580" y="74">⑤ 設定暫存器</text>
+  <text class="s" x="580" y="94">保存模式、停留佔比、呼吸開關</text>
+  <text class="s" x="580" y="112">短按切下一項 · 長按回預設</text>
 
-  <!-- 資料路徑 -->
-  <rect class="box" x="170" y="180" width="150" height="56" rx="6"/>
-  <text class="t" x="245" y="203">亮度 FSM</text>
-  <text class="s" x="245" y="222">三角波 · 最亮停留</text>
+  <!-- ② 亮度 FSM -->
+  <rect class="box" x="170" y="230" width="270" height="110" rx="6"/>
+  <text class="t" x="305" y="252">② 亮度 FSM</text>
+  <text class="s" x="305" y="272">漸亮 → 最亮停留 → 漸暗 → 最暗</text>
+  <text class="s" x="305" y="290">呼吸週期固定約 2 s</text>
+  <text class="s" x="305" y="308">最亮停留佔 0 / 25 / 50 / 75 %</text>
+  <text class="s" x="305" y="326">關閉呼吸時停在最亮（恆亮）</text>
 
-  <rect class="box" x="410" y="180" width="190" height="56" rx="6"/>
-  <text class="t" x="505" y="203">顏色控制</text>
-  <text class="s" x="505" y="222">白光 · 七色序列 · 色輪</text>
+  <!-- ⑥ 顏色控制 -->
+  <rect class="box" x="520" y="230" width="250" height="110" rx="6"/>
+  <text class="t" x="645" y="252">⑥ 顏色控制</text>
+  <text class="s" x="645" y="272">依模式決定目前顏色 C</text>
+  <text class="s" x="645" y="290">白光 / 七色序列 / HSV 色輪</text>
+  <text class="s" x="645" y="308">序列：亮度歸零時換下一色</text>
+  <text class="s" x="645" y="326">色輪：隨時間平滑轉動色相</text>
 
-  <rect class="box" x="410" y="300" width="190" height="56" rx="6"/>
-  <text class="t" x="505" y="323">顏色 × 亮度</text>
-  <text class="s" x="505" y="342">(C × level) &gt;&gt; 8</text>
+  <!-- ⑦ 資料路徑 -->
+  <rect class="box" x="360" y="410" width="560" height="70" rx="6"/>
+  <text class="t" x="640" y="436">⑦ 資料路徑 ×3</text>
+  <text class="s" x="640" y="458">顏色 × 亮度 → Gamma 校正（γ = 2.2） → 只在 PWM 週期交界更新 duty</text>
 
-  <rect class="box" x="640" y="300" width="130" height="56" rx="6"/>
-  <text class="t" x="705" y="323">Gamma LUT</text>
-  <text class="s" x="705" y="342">256 × 8 ROM</text>
+  <!-- ⑧ 比較器與輸出 -->
+  <rect class="box" x="960" y="410" width="170" height="70" rx="6"/>
+  <text class="t" x="1045" y="436">⑧ 比較器與輸出</text>
+  <text class="s" x="1045" y="458">計數值 &lt; duty 時點亮</text>
+  <text class="s" x="1045" y="474">依 LED 極性輸出</text>
 
-  <rect class="box" x="810" y="300" width="150" height="56" rx="6"/>
-  <text class="t" x="885" y="323">duty 影子暫存器</text>
-  <text class="s" x="885" y="342">比較器 · 暫存輸出</text>
+  <!-- ① PWM 計數器 -->
+  <rect class="box" x="190" y="550" width="220" height="70" rx="6"/>
+  <text class="t" x="300" y="574">① PWM 計數器</text>
+  <text class="s" x="300" y="594">產生約 1 kHz 的 8 bit 鋸齒波</text>
+  <text class="s" x="300" y="610">標出每個 PWM 週期結束點</text>
 
-  <rect class="box" x="170" y="420" width="150" height="56" rx="6"/>
-  <text class="t" x="245" y="443">PWM 計數器</text>
-  <text class="s" x="245" y="462">÷390 · 8 bit ≈ 1 kHz</text>
-
-  <text class="l" x="20" y="505">所有區塊由同一個 clk 驅動（圖中只畫到 PWM 計數器與 1 ms 節拍）；step_tick 也驅動顏色控制的色輪步進，圖中省略。</text>
+  <!-- 註解 -->
+  <text class="l" x="20" y="654">每個方塊對應 src/HW_2.vhd 中一個編號區段的 process；全部由同一個 clk 驅動，不產生衍生時脈。</text>
+  <text class="l" x="20" y="672">PWM 週期結束點也提供給 ⑥ 做色輪步進，圖中省略；RGB 三通道共用 ①–⑥，⑦、⑧ 各有 ×3 份。</text>
 </svg>

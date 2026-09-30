@@ -11,16 +11,20 @@
 
 ## 架構
 
+每個方塊是一個 process（編號對應 `src/HW_2.vhd` 的區段），圖中只寫它負責的功能。
+
 ![HW2 架構圖](docs/architecture.svg)
 
-| 區塊 | 功能 | 規格章節 |
+| Process | 功能 | 規格章節 |
 |---|---|---|
-| PWM 計數器 | 前除頻 390 + 8 bit 計數，約 1 kHz；duty 只在 `pwm_end` 更新，避免殘缺脈波 | §4 |
-| 亮度 FSM | `UP → HOLD_TOP → DOWN → HOLD_BOTTOM` 三角波，預設週期約 2 s | §5.1 |
-| Gamma 校正 | 256 × 8 ROM（γ = 2.2），elaboration 時由 `math_real` 產生 | §5.2 |
-| 顏色控制 | 固定白光／七色序列（在亮度為 0 時換色）／HSV 色輪 | §6 |
-| 按鈕介面 | 1 ms 節拍、20 ms 去彈跳；短按切到下一選項，長按回預設 | §7 |
-| 狀態指示 | `status` 5 bit 直接顯示目前設定 | §7.4 |
+| ① PWM 計數器 | 前除頻 390 + 8 bit 計數，約 1 kHz；標出每個 PWM 週期結束點 | §4 |
+| ② 亮度 FSM | 漸亮 → 最亮停留 → 漸暗 → 最暗，週期固定約 2 s；停留佔比可切換，關閉呼吸時恆亮 | §5.1、§5.3、§5.4 |
+| ③ 1 ms 節拍 | 提供按鈕去彈跳與長按計時的時間基準 | §7.2 |
+| ④ 按鈕介面 ×3 | 同步、20 ms 去彈跳；放開為短按，按滿 1 s 為長按 | §7.2 |
+| ⑤ 設定暫存器 | 保存 `mode` / `hold_sel` / `breath_en`，短按切下一項、長按回預設；同時輸出 `status` | §7.1、§7.4 |
+| ⑥ 顏色控制 | 固定白光／七色序列（亮度歸零時換色）／HSV 色輪 | §6 |
+| ⑦ 資料路徑 ×3 | 顏色 × 亮度 → Gamma 校正（γ = 2.2）→ 只在 PWM 週期交界更新 duty，避免殘缺脈波 | §4.2、§5.2、§6.1 |
+| ⑧ 比較器與輸出 ×3 | 計數值 < duty 時點亮，依 LED 極性輸出 | §4.2 |
 
 ### 介面
 
@@ -45,7 +49,7 @@
 | `sim/HW_2_tb.vhd` | 自我檢查測試檔，涵蓋 SPEC §9 全部項目；`run all` 後印出 PASS / FAIL |
 | `Create-Project.tcl` | 由本目錄原始碼建立 Vivado 專案 |
 | `Import-FromVivado.ps1` | 從舊 Vivado 專案匯入 HW2 檔案 |
-| `docs/architecture.svg` | 架構圖 |
+| `docs/architecture.svg` | 架構圖（各 process 功能） |
 
 ## 進度與待辦
 
