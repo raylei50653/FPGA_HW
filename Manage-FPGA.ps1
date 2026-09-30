@@ -4,7 +4,7 @@ param(
     [ValidateSet('help', 'status', 'import', 'create', 'open')]
     [string]$Action = 'help',
     [Parameter(Position = 1)]
-    [ValidatePattern('^HW[1-9][0-9]*$')]
+    [ValidatePattern('^HW[1-9][0-9]*(_[a-z]+)?$')]
     [string]$Homework = 'HW1',
     [switch]$Update,
     [string]$VivadoProjectPath,

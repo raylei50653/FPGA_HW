@@ -1,0 +1,91 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 440" width="1000" height="440" role="img" aria-label="HW2_a 呼吸燈架構圖：FSM1、upbnd1/upbnd2、HW1 雙計數器與 PWM counter">
+  <style>
+    .box { fill: #f6f8fa; stroke: #8c959f; stroke-width: 1.2; }
+    .io  { fill: #ddf4ff; stroke: #54aeff; stroke-width: 1.2; }
+    .t { font: 600 14px "Noto Sans TC", "Microsoft JhengHei", "PingFang TC", sans-serif; fill: #1f2328; text-anchor: middle; }
+    .p { font: 600 13px ui-monospace, "Cascadia Code", Consolas, monospace; fill: #1f2328; text-anchor: middle; }
+    .s { font: 11px "Noto Sans TC", "Microsoft JhengHei", "PingFang TC", sans-serif; fill: #59636e; text-anchor: middle; }
+    .l { font: 11px "Noto Sans TC", "Microsoft JhengHei", "PingFang TC", sans-serif; fill: #59636e; }
+    .e { fill: none; stroke: #59636e; stroke-width: 1.4; }
+    .ah { fill: #59636e; }
+    @media (prefers-color-scheme: dark) {
+      .box { fill: #161b22; stroke: #3d444d; }
+      .io  { fill: #0d2a4d; stroke: #1f6feb; }
+      .t, .p { fill: #e6edf3; }
+      .s, .l { fill: #9198a1; }
+      .e { stroke: #9198a1; }
+      .ah { fill: #9198a1; }
+    }
+  </style>
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path class="ah" d="M0,0 L10,5 L0,10 z"/>
+    </marker>
+  </defs>
+
+  <!-- 連線 -->
+  <g class="e" marker-end="url(#a)">
+    <!-- clk -> FSM1 -->
+    <path d="M120 210 H140"/>
+    <!-- FSM1 -> upbnd1 / upbnd2 -->
+    <path d="M300 190 H350 V90 H400"/>
+    <path d="M300 230 H350 V330 H400"/>
+    <!-- upbnd -> FSM1：已最亮 / 已最暗 -->
+    <path d="M440 60 V30 H220 V170"/>
+    <path d="M440 360 V400 H220 V250"/>
+    <!-- upbnd -> HW1 -->
+    <path d="M560 90 H610 V170 H660"/>
+    <path d="M560 330 H610 V250 H660"/>
+    <!-- HW1 -> PWM counter -> upbnd -->
+    <path d="M660 210 H560"/>
+    <path d="M480 180 V120"/>
+    <path d="M480 240 V300"/>
+    <!-- HW1 -> LED -->
+    <path d="M830 210 H880"/>
+  </g>
+
+  <!-- 連線標籤 -->
+  <text class="l" x="330" y="22" text-anchor="middle">已最亮：upbnd1 = MAX · 已最暗：upbnd1 = 0</text>
+  <text class="l" x="330" y="394" text-anchor="middle">upbnd2 = 0 / MAX</text>
+  <text class="l" x="375" y="84" text-anchor="middle">±1</text>
+  <text class="l" x="375" y="324" text-anchor="middle">∓1</text>
+  <text class="l" x="488" y="154">step</text>
+  <text class="l" x="488" y="276">step</text>
+  <text class="l" x="610" y="202" text-anchor="middle">pwm_end</text>
+
+  <!-- 輸入 / 輸出 -->
+  <rect class="io" x="20" y="190" width="100" height="40" rx="20"/>
+  <text class="p" x="70" y="215">clk/reset</text>
+  <rect class="io" x="880" y="190" width="100" height="40" rx="20"/>
+  <text class="p" x="930" y="215">led</text>
+
+  <!-- FSM1 -->
+  <rect class="box" x="140" y="170" width="160" height="80" rx="6"/>
+  <text class="t" x="220" y="198">FSM1（Moore）</text>
+  <text class="s" x="220" y="218">變暗ing ⇄ 變亮ing</text>
+  <text class="s" x="220" y="236">決定 upbnd 往哪走</text>
+
+  <!-- upbnd1 / upbnd2 -->
+  <rect class="box" x="400" y="60" width="160" height="60" rx="6"/>
+  <text class="t" x="480" y="84">upbnd1</text>
+  <text class="s" x="480" y="104">亮的 clk 數 0 ~ MAX</text>
+
+  <rect class="box" x="400" y="300" width="160" height="60" rx="6"/>
+  <text class="t" x="480" y="324">upbnd2</text>
+  <text class="s" x="480" y="344">暗的 clk 數 = MAX − upbnd1</text>
+
+  <!-- PWM counter -->
+  <rect class="box" x="400" y="180" width="160" height="60" rx="6"/>
+  <text class="t" x="480" y="204">PWM counter</text>
+  <text class="s" x="480" y="224">數 PWM 週期，撐 1/30 s</text>
+
+  <!-- HW1 -->
+  <rect class="box" x="660" y="150" width="170" height="120" rx="6"/>
+  <text class="t" x="745" y="174">HW1 雙計數器</text>
+  <text class="s" x="745" y="198">COUNT1：數 upbnd1 → 亮</text>
+  <text class="s" x="745" y="218">COUNT2：數 upbnd2 → 暗</text>
+  <text class="s" x="745" y="238">交替 = PWM</text>
+  <text class="s" x="745" y="256">週期固定 MAX clk</text>
+
+  <text class="l" x="20" y="432">全部由同一個 clk 驅動；upbnd 只在 PWM 週期結束（pwm_end）時更新，上限為 0 的那一段直接跳過。</text>
+</svg>

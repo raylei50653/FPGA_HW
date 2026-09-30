@@ -8,8 +8,8 @@ if {![info exists homework]} {
 if {$homework eq ""} {
     set homework HW1
 }
-if {![regexp {^HW([1-9][0-9]*)$} $homework -> homework_number]} {
-    error "Expected a homework name such as HW1."
+if {![regexp {^HW([1-9][0-9]*)(_[a-z]+)?$} $homework -> homework_number homework_suffix]} {
+    error "Expected a homework name such as HW1 or HW2_a."
 }
 
 set homework_dir [file join $repo_root $homework]
@@ -38,7 +38,7 @@ if {[llength $source_files] == 0} {
 
 create_project $homework $project_dir -part xc7k70tfbv676-1
 add_files -norecurse -fileset sources_1 $source_files
-set_property top HW_$homework_number [get_filesets sources_1]
+set_property top HW_${homework_number}${homework_suffix} [get_filesets sources_1]
 
 set simulation_files {}
 foreach extension {vhd vhdl v sv} {
@@ -48,7 +48,10 @@ foreach extension {vhd vhdl v sv} {
 }
 if {[llength $simulation_files] > 0} {
     add_files -norecurse -fileset sim_1 $simulation_files
-    set_property top HW_${homework_number}_tb [get_filesets sim_1]
+    set_property top HW_${homework_number}${homework_suffix}_tb [get_filesets sim_1]
+    if {[info exists sim_runtime]} {
+        set_property -name {xsim.simulate.runtime} -value $sim_runtime -objects [get_filesets sim_1]
+    }
 }
 
 set constraint_files [glob -nocomplain -directory $constraints_dir *.xdc]
