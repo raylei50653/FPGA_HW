@@ -11,20 +11,7 @@
 
 ## 架構
 
-```mermaid
-flowchart LR
-    btn([3 顆按鈕]) --> btnif["按鈕介面<br/>同步 / 去彈跳 / 短長按"]
-    btnif --> cfg["設定暫存器<br/>mode / hold_sel / breath_en"]
-    cfg --> status([status])
-    pwm["PWM 計數器"] -- pwm_end --> breath["亮度三角波 FSM"]
-    cfg --> breath
-    cfg --> color["顏色控制"]
-    breath -- level --> mix["顏色 × 亮度"]
-    color -- RGB --> mix
-    mix --> gamma["Gamma LUT"] --> cmp["duty 影子暫存器<br/>+ 比較器"]
-    pwm -- pwm_cnt --> cmp
-    cmp --> led([led_r / led_g / led_b])
-```
+![HW2 架構圖](docs/architecture.svg)
 
 | 區塊 | 功能 | 規格章節 |
 |---|---|---|
@@ -58,6 +45,7 @@ flowchart LR
 | `sim/HW_2_tb.vhd` | 測試檔（目前為空白範本，驗證項目規劃見 SPEC §9） |
 | `Create-Project.tcl` | 由本目錄原始碼建立 Vivado 專案 |
 | `Import-FromVivado.ps1` | 從舊 Vivado 專案匯入 HW2 檔案 |
+| `docs/architecture.svg` | 架構圖 |
 
 ## 進度與待辦
 

@@ -1,0 +1,70 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 300" width="800" height="300" role="img" aria-label="HW1 雙計數器狀態機架構圖">
+  <style>
+    .box { fill: #f6f8fa; stroke: #8c959f; stroke-width: 1.2; }
+    .io  { fill: #ddf4ff; stroke: #54aeff; stroke-width: 1.2; }
+    .t { font: 600 14px "Noto Sans TC", "Microsoft JhengHei", "PingFang TC", sans-serif; fill: #1f2328; text-anchor: middle; }
+    .s { font: 11px "Noto Sans TC", "Microsoft JhengHei", "PingFang TC", sans-serif; fill: #59636e; text-anchor: middle; }
+    .l { font: 11px "Noto Sans TC", "Microsoft JhengHei", "PingFang TC", sans-serif; fill: #59636e; }
+    .e { fill: none; stroke: #59636e; stroke-width: 1.4; }
+    .ah { fill: #59636e; }
+    @media (prefers-color-scheme: dark) {
+      .box { fill: #161b22; stroke: #3d444d; }
+      .io  { fill: #0d2a4d; stroke: #1f6feb; }
+      .t { fill: #e6edf3; }
+      .s, .l { fill: #9198a1; }
+      .e { stroke: #9198a1; }
+      .ah { fill: #9198a1; }
+    }
+  </style>
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path class="ah" d="M0,0 L10,5 L0,10 z"/>
+    </marker>
+  </defs>
+
+  <!-- 連線 -->
+  <g class="e" marker-end="url(#a)">
+    <path d="M120 144 H150"/>
+    <path d="M235 116 V52 H430"/>
+    <path d="M235 172 V236 H430"/>
+    <path d="M515 80 V116"/>
+    <path d="M515 208 V172"/>
+    <path d="M430 144 H320"/>
+    <path d="M600 52 H680"/>
+    <path d="M600 236 H680"/>
+  </g>
+
+  <!-- 連線標籤 -->
+  <text class="l" x="332" y="44" text-anchor="middle">state = COUNT1 時致能</text>
+  <text class="l" x="332" y="228" text-anchor="middle">state = COUNT2 時致能</text>
+  <text class="l" x="523" y="102">c1 = 9</text>
+  <text class="l" x="523" y="194">c2 = 17</text>
+  <text class="l" x="375" y="136" text-anchor="middle">next_state</text>
+
+  <!-- 輸入 / 輸出 -->
+  <rect class="io" x="20" y="124" width="100" height="40" rx="20"/>
+  <text class="t" x="70" y="149">clk / reset</text>
+  <rect class="io" x="680" y="32" width="110" height="40" rx="20"/>
+  <text class="t" x="735" y="57">count1 [3:0]</text>
+  <rect class="io" x="680" y="216" width="110" height="40" rx="20"/>
+  <text class="t" x="735" y="241">count2 [7:0]</text>
+
+  <!-- 區塊 -->
+  <rect class="box" x="150" y="116" width="170" height="56" rx="6"/>
+  <text class="t" x="235" y="139">狀態暫存器</text>
+  <text class="s" x="235" y="158">COUNT1 · COUNT2</text>
+
+  <rect class="box" x="430" y="24" width="170" height="56" rx="6"/>
+  <text class="t" x="515" y="47">Count1</text>
+  <text class="s" x="515" y="66">0 → 9 上數</text>
+
+  <rect class="box" x="430" y="116" width="170" height="56" rx="6"/>
+  <text class="t" x="515" y="139">下一狀態邏輯</text>
+  <text class="s" x="515" y="158">判斷計數終點</text>
+
+  <rect class="box" x="430" y="208" width="170" height="56" rx="6"/>
+  <text class="t" x="515" y="231">Count2</text>
+  <text class="s" x="515" y="250">253 → 17 下數</text>
+
+  <text class="l" x="20" y="290">單一時脈域 · 同步 reset（高電位有效）</text>
+</svg>

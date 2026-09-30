@@ -10,17 +10,7 @@
 
 ## 架構
 
-```mermaid
-flowchart LR
-    clk([clk / reset]) --> fsm["狀態暫存器<br/>COUNT1_STATE / COUNT2_STATE"]
-    fsm -- state --> c1["Count1<br/>0 → 9 上數"]
-    fsm -- state --> c2["Count2<br/>253 → 17 下數"]
-    c1 -- "c1 = 9" --> next["下一狀態邏輯"]
-    c2 -- "c2 = 17" --> next
-    next -- next_state --> fsm
-    c1 --> o1([count1 4 bit])
-    c2 --> o2([count2 8 bit])
-```
+![HW1 架構圖](docs/architecture.svg)
 
 | 狀態 | 動作 | 轉移條件 |
 |---|---|---|
@@ -47,6 +37,7 @@ flowchart LR
 | `sim/HW_1_tb.vhd` | 測試檔：10 ns 時脈，reset 2 拍後放開，模擬 3000 ns（約 1.2 個循環） |
 | `Create-Project.tcl` | 由本目錄原始碼建立 Vivado 專案 |
 | `Import-FromVivado.ps1` | 從舊 Vivado 專案匯入 HW1 檔案 |
+| `docs/architecture.svg` | 架構圖 |
 
 ## 使用
 
