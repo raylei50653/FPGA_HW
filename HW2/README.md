@@ -1,30 +1,81 @@
-# HW2
+# HW2 RGB 呼吸燈
 
-- `src/`：可綜合的設計原始碼，目前尚未加入。
-- `sim/HW_2_tb.vhd`：Vivado 模擬測試檔。
+## 用途
 
-原始 Vivado 專案目錄中雖有 HW2 測試檔，但專案設定尚未納入該檔。
-匯入腳本會從舊專案的 `project_1.srcs` 找到此測試檔。
+以 PWM 驅動 RGB LED，亮度依固定週期平滑地「漸亮 → 漸暗」循環，並可透過三顆按鈕
+切換顏色模式、最亮停留時間與呼吸／恆亮。完整規格與設計理由見 [`SPEC.md`](SPEC.md)。
 
-## 從舊專案匯入
+- 目標器件：`xc7k70tfbv676-1`（與 HW1 相同）
+- Top 模組：`HW_2`，測試檔：`HW_2_tb`
+- 全同步設計、單一時脈域；時間參數皆為 generic，模擬時可縮短
+
+## 架構
+
+```mermaid
+flowchart LR
+    btn([3 顆按鈕]) --> btnif["按鈕介面<br/>同步 / 去彈跳 / 短長按"]
+    btnif --> cfg["設定暫存器<br/>mode / hold_sel / breath_en"]
+    cfg --> status([status])
+    pwm["PWM 計數器"] -- pwm_end --> breath["亮度三角波 FSM"]
+    cfg --> breath
+    cfg --> color["顏色控制"]
+    breath -- level --> mix["顏色 × 亮度"]
+    color -- RGB --> mix
+    mix --> gamma["Gamma LUT"] --> cmp["duty 影子暫存器<br/>+ 比較器"]
+    pwm -- pwm_cnt --> cmp
+    cmp --> led([led_r / led_g / led_b])
+```
+
+| 區塊 | 功能 | 規格章節 |
+|---|---|---|
+| PWM 計數器 | 前除頻 390 + 8 bit 計數，約 1 kHz；duty 只在 `pwm_end` 更新，避免殘缺脈波 | §4 |
+| 亮度 FSM | `UP → HOLD_TOP → DOWN → HOLD_BOTTOM` 三角波，預設週期約 2 s | §5.1 |
+| Gamma 校正 | 256 × 8 ROM（γ = 2.2），elaboration 時由 `math_real` 產生 | §5.2 |
+| 顏色控制 | 固定白光／七色序列（在亮度為 0 時換色）／HSV 色輪 | §6 |
+| 按鈕介面 | 1 ms 節拍、20 ms 去彈跳；短按切到下一選項，長按回預設 | §7 |
+| 狀態指示 | `status` 5 bit 直接顯示目前設定 | §7.4 |
+
+### 介面
+
+| Port | 方向 | 寬度 | 說明 |
+|---|---|---|---|
+| `clk` / `reset` | in | 1 | 系統時脈；同步 reset，高電位有效 |
+| `btn_mode` | in | 1 | 顏色模式：白光 → 序列 → 色輪 |
+| `btn_hold` | in | 1 | 最亮停留佔比：0% / 20% / 33% / 50% |
+| `btn_breath` | in | 1 | 呼吸／恆亮切換 |
+| `led_r` / `led_g` / `led_b` | out | 1 | PWM 輸出 |
+| `status` | out | 5 | `mode`(1:0)、`hold_sel`(3:2)、`breath_en`(4) |
+
+主要 generic：`CLK_FREQ_HZ`、`PWM_BITS`、`PWM_DIV`、`STEP_PERIODS`、`GAMMA_EN`、
+`LED_ACTIVE_LOW`、`BTN_ACTIVE_LOW` 等，預設值與說明見 SPEC §3.1。
+
+## 檔案
+
+| 路徑 | 內容 |
+|---|---|
+| `SPEC.md` | 設計規格：參數計算、FSM、顏色與按鈕行為、驗證計畫 |
+| `src/HW_2.vhd` | 設計原始碼 |
+| `sim/HW_2_tb.vhd` | 測試檔（目前為空白範本，驗證項目規劃見 SPEC §9） |
+| `Create-Project.tcl` | 由本目錄原始碼建立 Vivado 專案 |
+| `Import-FromVivado.ps1` | 從舊 Vivado 專案匯入 HW2 檔案 |
+
+## 進度與待辦
+
+- [x] 規格（`SPEC.md`）
+- [x] 設計原始碼（`src/HW_2.vhd`）
+- [ ] 測試檔：依 SPEC §9 補齊，模擬時覆寫 generic 縮短時間
+- [ ] 約束檔：板子型號、時脈、LED 與按鈕腳位確認後建立 `constraints/`（見 SPEC §10）
+
+## 使用
 
 在儲存庫根目錄執行：
 
 ```powershell
-.\Manage-FPGA.ps1 import HW2
+.\Manage-FPGA.ps1 import HW2   # 從舊專案匯入（內容不同會停止，覆蓋請加 -Update）
+.\Manage-FPGA.ps1 create HW2   # 建立 vivado/HW2/HW2.xpr，已存在時不要重複執行
+.\Manage-FPGA.ps1 open HW2
 ```
 
-預設來源為 `D:\Documents\vivado_2\project_1`。內容不同時腳本會停止；
-確認要用舊專案版本覆蓋後，改用 `.\Manage-FPGA.ps1 import HW2 -Update`。
-其他來源可加上 `-VivadoProjectPath 'D:\path\to\project'`。
-
-## 建立專案
-
-請先將 HW2 設計原始碼匯入 `src/`，再執行：
-
-```powershell
-.\Manage-FPGA.ps1 create HW2
-```
-
-產生的專案位於 `vivado/HW2/HW2.xpr`。目前 `src/` 尚無設計檔，
-因此建立腳本會提示缺少原始碼。
+舊專案目錄中雖有 HW2 測試檔，但專案設定尚未納入；匯入腳本會直接從
+`project_1.srcs` 找到它。匯入來源預設為 `D:\Documents\vivado_2\project_1`，可用
+`-VivadoProjectPath 'D:\path\to\project'` 指定其他位置。詳細流程見根目錄 `README.md`。
