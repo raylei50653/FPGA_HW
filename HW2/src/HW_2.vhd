@@ -79,6 +79,20 @@ architecture Behavioral of HW_2 is
 
     constant GAMMA_ROM : gamma_rom_t := gen_gamma;
 
+    -- gamma(0) = 0、gamma(max) = max、單調不減
+    function gamma_ok(rom : gamma_rom_t) return boolean is
+    begin
+        if rom(0) /= 0 or rom(2**N - 1) /= 2**N - 1 then
+            return false;
+        end if;
+        for i in 1 to 2**N - 1 loop
+            if rom(i) < rom(i - 1) then
+                return false;
+            end if;
+        end loop;
+        return true;
+    end function;
+
     -- PWM
     signal div_cnt  : integer range 0 to PWM_DIV - 1 := 0;
     signal pwm_cnt  : unsigned(N-1 downto 0) := (others => '0');
@@ -136,6 +150,14 @@ begin
     -- DDA 每個 PWM 週期最多走一步，斜坡不得短於 R 個週期
     assert RAMP_LEN(3) >= R_INT
         report "CYCLE_PERIODS too small: 75% hold leaves a ramp shorter than 2^PWM_BITS-1 periods"
+        severity failure;
+
+    assert CLK_FREQ_HZ >= 1000 and CLK_FREQ_HZ mod 1000 = 0
+        report "CLK_FREQ_HZ must be a multiple of 1000 for an exact 1 ms tick"
+        severity failure;
+
+    assert gamma_ok(GAMMA_ROM)
+        report "GAMMA_ROM must satisfy gamma(0) = 0, gamma(max) = max and be non-decreasing"
         severity failure;
 
     --------------------------------------------------
