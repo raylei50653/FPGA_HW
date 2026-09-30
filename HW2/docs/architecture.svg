@@ -1,8 +1,9 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1110 480" width="1110" height="480" role="img" aria-label="HW2 RGB 呼吸燈架構圖">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1110 520" width="1110" height="520" role="img" aria-label="HW2 RGB 呼吸燈架構圖">
   <style>
     .box { fill: #f6f8fa; stroke: #8c959f; stroke-width: 1.2; }
     .io  { fill: #ddf4ff; stroke: #54aeff; stroke-width: 1.2; }
     .t { font: 600 14px "Noto Sans TC", "Microsoft JhengHei", "PingFang TC", sans-serif; fill: #1f2328; text-anchor: middle; }
+    .p { font: 600 13px ui-monospace, "Cascadia Code", Consolas, monospace; fill: #1f2328; text-anchor: middle; }
     .s { font: 11px "Noto Sans TC", "Microsoft JhengHei", "PingFang TC", sans-serif; fill: #59636e; text-anchor: middle; }
     .l { font: 11px "Noto Sans TC", "Microsoft JhengHei", "PingFang TC", sans-serif; fill: #59636e; }
     .e { fill: none; stroke: #59636e; stroke-width: 1.4; }
@@ -10,7 +11,7 @@
     @media (prefers-color-scheme: dark) {
       .box { fill: #161b22; stroke: #3d444d; }
       .io  { fill: #0d2a4d; stroke: #1f6feb; }
-      .t { fill: #e6edf3; }
+      .t, .p { fill: #e6edf3; }
       .s, .l { fill: #9198a1; }
       .e { stroke: #9198a1; }
       .ah { fill: #9198a1; }
@@ -24,77 +25,99 @@
 
   <!-- 連線 -->
   <g class="e" marker-end="url(#a)">
-    <path d="M120 58 H150"/>
-    <path d="M300 58 H380"/>
-    <path d="M570 58 H990"/>
-    <path d="M420 86 V118 H225 V150"/>
-    <path d="M510 86 V150"/>
-    <path d="M300 178 H380"/>
-    <path d="M270 206 V298 H380"/>
-    <path d="M475 206 V270"/>
-    <path d="M570 298 H620"/>
-    <path d="M750 298 H800"/>
-    <path d="M950 298 H990"/>
-    <path d="M120 418 H150"/>
-    <path d="M190 390 V206"/>
-    <path d="M300 418 H875 V326"/>
+    <!-- 按鈕 -> 按鈕介面 -->
+    <path d="M130 36 H170"/>
+    <path d="M130 78 H170"/>
+    <path d="M130 120 H170"/>
+    <!-- 按鈕介面 -> 設定暫存器 -> status -->
+    <path d="M320 78 H410"/>
+    <path d="M600 78 H990"/>
+    <!-- 設定 -> 亮度 FSM / 顏色控制 -->
+    <path d="M450 106 V150 H245 V180"/>
+    <path d="M560 106 V180"/>
+    <!-- 亮度 FSM -> 顏色控制 / 混合 -->
+    <path d="M320 208 H410"/>
+    <path d="M290 236 V328 H410"/>
+    <!-- 顏色控制 -> 混合 -> Gamma -> duty -> LED -->
+    <path d="M505 236 V300"/>
+    <path d="M600 328 H640"/>
+    <path d="M770 328 H810"/>
+    <path d="M960 328 H990"/>
+    <!-- clk -> PWM / 1 ms 節拍 -->
+    <path d="M130 448 H170"/>
+    <path d="M75 428 V236"/>
+    <!-- 1 ms 節拍 -> 按鈕介面 -->
+    <path d="M100 180 V152 H190 V126"/>
+    <!-- PWM -> 亮度 FSM / duty 影子暫存器 -->
+    <path d="M210 420 V236"/>
+    <path d="M320 448 H885 V356"/>
   </g>
 
   <!-- 連線標籤 -->
-  <text class="l" x="340" y="50" text-anchor="middle">short / long</text>
-  <text class="l" x="780" y="50" text-anchor="middle">設定值</text>
-  <text class="l" x="322" y="112" text-anchor="middle">hold_sel · breath_en</text>
-  <text class="l" x="518" y="122">mode</text>
-  <text class="l" x="340" y="170" text-anchor="middle">cycle_end</text>
-  <text class="l" x="325" y="290" text-anchor="middle">level</text>
-  <text class="l" x="483" y="242">RGB</text>
-  <text class="l" x="775" y="290" text-anchor="middle">duty</text>
-  <text class="l" x="182" y="300" text-anchor="end">pwm_end</text>
-  <text class="l" x="600" y="410" text-anchor="middle">pwm_cnt · pwm_end</text>
+  <text class="l" x="365" y="70" text-anchor="middle">short / long</text>
+  <text class="l" x="795" y="70" text-anchor="middle">breath_en · hold_sel · mode</text>
+  <text class="l" x="795" y="94" text-anchor="middle">status(4) · (3:2) · (1:0)</text>
+  <text class="l" x="345" y="144" text-anchor="middle">hold_sel · breath_en</text>
+  <text class="l" x="568" y="148">mode</text>
+  <text class="l" x="112" y="168">tick_1ms</text>
+  <text class="l" x="365" y="200" text-anchor="middle">cycle_end</text>
+  <text class="l" x="350" y="320" text-anchor="middle">level</text>
+  <text class="l" x="513" y="272">RGB</text>
+  <text class="l" x="790" y="320" text-anchor="middle">duty</text>
+  <text class="l" x="202" y="330" text-anchor="end">pwm_end</text>
+  <text class="l" x="600" y="440" text-anchor="middle">pwm_cnt · pwm_end</text>
 
   <!-- 輸入 / 輸出 -->
-  <rect class="io" x="20" y="38" width="100" height="40" rx="20"/>
-  <text class="t" x="70" y="63">btn ×3</text>
-  <rect class="io" x="20" y="398" width="100" height="40" rx="20"/>
-  <text class="t" x="70" y="423">clk / reset</text>
-  <rect class="io" x="990" y="38" width="100" height="40" rx="20"/>
-  <text class="t" x="1040" y="63">status</text>
-  <rect class="io" x="990" y="278" width="100" height="40" rx="20"/>
-  <text class="t" x="1040" y="303">led_r/g/b</text>
+  <rect class="io" x="20" y="20" width="110" height="32" rx="16"/>
+  <text class="p" x="75" y="41">btn_mode</text>
+  <rect class="io" x="20" y="62" width="110" height="32" rx="16"/>
+  <text class="p" x="75" y="83">btn_hold</text>
+  <rect class="io" x="20" y="104" width="110" height="32" rx="16"/>
+  <text class="p" x="75" y="125">btn_breath</text>
+  <rect class="io" x="20" y="428" width="110" height="40" rx="20"/>
+  <text class="p" x="75" y="453">clk / reset</text>
+  <rect class="io" x="990" y="58" width="100" height="40" rx="20"/>
+  <text class="p" x="1040" y="83">status</text>
+  <rect class="io" x="990" y="308" width="100" height="40" rx="20"/>
+  <text class="p" x="1040" y="333">led_r/g/b</text>
 
   <!-- 控制路徑 -->
-  <rect class="box" x="150" y="30" width="150" height="56" rx="6"/>
-  <text class="t" x="225" y="53">按鈕介面</text>
-  <text class="s" x="225" y="72">同步 · 去彈跳 · 短/長按</text>
+  <rect class="box" x="20" y="180" width="110" height="56" rx="6"/>
+  <text class="t" x="75" y="203">1 ms 節拍</text>
+  <text class="s" x="75" y="222">÷100,000</text>
 
-  <rect class="box" x="380" y="30" width="190" height="56" rx="6"/>
-  <text class="t" x="475" y="53">設定暫存器</text>
-  <text class="s" x="475" y="72">mode · hold_sel · breath_en</text>
+  <rect class="box" x="170" y="30" width="150" height="96" rx="6"/>
+  <text class="t" x="245" y="72">按鈕介面 ×3</text>
+  <text class="s" x="245" y="92">同步 · 去彈跳 · 短/長按</text>
+
+  <rect class="box" x="410" y="50" width="190" height="56" rx="6"/>
+  <text class="t" x="505" y="73">設定暫存器</text>
+  <text class="s" x="505" y="92">mode · hold_sel · breath_en</text>
 
   <!-- 資料路徑 -->
-  <rect class="box" x="150" y="150" width="150" height="56" rx="6"/>
-  <text class="t" x="225" y="173">亮度 FSM</text>
-  <text class="s" x="225" y="192">三角波 · 最亮停留</text>
+  <rect class="box" x="170" y="180" width="150" height="56" rx="6"/>
+  <text class="t" x="245" y="203">亮度 FSM</text>
+  <text class="s" x="245" y="222">三角波 · 最亮停留</text>
 
-  <rect class="box" x="380" y="150" width="190" height="56" rx="6"/>
-  <text class="t" x="475" y="173">顏色控制</text>
-  <text class="s" x="475" y="192">白光 · 七色序列 · 色輪</text>
+  <rect class="box" x="410" y="180" width="190" height="56" rx="6"/>
+  <text class="t" x="505" y="203">顏色控制</text>
+  <text class="s" x="505" y="222">白光 · 七色序列 · 色輪</text>
 
-  <rect class="box" x="380" y="270" width="190" height="56" rx="6"/>
-  <text class="t" x="475" y="293">顏色 × 亮度</text>
-  <text class="s" x="475" y="312">(C × level) &gt;&gt; 8</text>
+  <rect class="box" x="410" y="300" width="190" height="56" rx="6"/>
+  <text class="t" x="505" y="323">顏色 × 亮度</text>
+  <text class="s" x="505" y="342">(C × level) &gt;&gt; 8</text>
 
-  <rect class="box" x="620" y="270" width="130" height="56" rx="6"/>
-  <text class="t" x="685" y="293">Gamma LUT</text>
-  <text class="s" x="685" y="312">256 × 8 ROM</text>
+  <rect class="box" x="640" y="300" width="130" height="56" rx="6"/>
+  <text class="t" x="705" y="323">Gamma LUT</text>
+  <text class="s" x="705" y="342">256 × 8 ROM</text>
 
-  <rect class="box" x="800" y="270" width="150" height="56" rx="6"/>
-  <text class="t" x="875" y="293">duty 影子暫存器</text>
-  <text class="s" x="875" y="312">比較器 · 暫存輸出</text>
+  <rect class="box" x="810" y="300" width="150" height="56" rx="6"/>
+  <text class="t" x="885" y="323">duty 影子暫存器</text>
+  <text class="s" x="885" y="342">比較器 · 暫存輸出</text>
 
-  <rect class="box" x="150" y="390" width="150" height="56" rx="6"/>
-  <text class="t" x="225" y="413">PWM 計數器</text>
-  <text class="s" x="225" y="432">÷390 · 8 bit ≈ 1 kHz</text>
+  <rect class="box" x="170" y="420" width="150" height="56" rx="6"/>
+  <text class="t" x="245" y="443">PWM 計數器</text>
+  <text class="s" x="245" y="462">÷390 · 8 bit ≈ 1 kHz</text>
 
-  <text class="l" x="20" y="470">所有區塊由同一個 clk 驅動；pwm_end 也驅動顏色控制（色輪步進），圖中省略。</text>
+  <text class="l" x="20" y="505">所有區塊由同一個 clk 驅動（圖中只畫到 PWM 計數器與 1 ms 節拍）；step_tick 也驅動顏色控制的色輪步進，圖中省略。</text>
 </svg>

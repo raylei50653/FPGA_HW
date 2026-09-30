@@ -6,16 +6,17 @@ use IEEE.MATH_REAL.ALL;
 -- HW2 呼吸燈（規格見 HW2/SPEC.md）
 entity HW_2 is
     Generic (
-        CLK_FREQ_HZ       : natural := 100_000_000; -- 系統時脈，同時決定 1 ms 節拍
-        PWM_BITS          : natural := 8;           -- PWM 解析度 N（>= 2）
-        PWM_DIV           : natural := 390;         -- PWM 前除頻
-        STEP_PERIODS      : natural := 4;           -- 每階亮度的 PWM 週期數
-        HOLD_BOTTOM_STEPS : natural := 0;           -- 最暗停留階數
-        GAMMA_EN          : boolean := true;
-        LED_ACTIVE_LOW    : boolean := false;
-        DEBOUNCE_MS       : natural := 20;
-        LONG_PRESS_MS     : natural := 1000;
-        BTN_ACTIVE_LOW    : boolean := false
+        CLK_FREQ_HZ         : natural := 100_000_000; -- 系統時脈，同時決定 1 ms 節拍
+        PWM_BITS            : natural := 8;           -- PWM 解析度 N（>= 2）
+        PWM_DIV             : natural := 390;         -- PWM 前除頻
+        CYCLE_PERIODS       : natural := 2048;        -- 呼吸週期（PWM 週期數），約 2.04 s
+        HOLD_BOTTOM_PERIODS : natural := 0;           -- 最暗停留（PWM 週期數）
+        HUE_PERIODS         : natural := 4;           -- 色輪每步的 PWM 週期數
+        GAMMA_EN            : boolean := true;
+        LED_ACTIVE_LOW      : boolean := false;
+        DEBOUNCE_MS         : natural := 20;
+        LONG_PRESS_MS       : natural := 1000;
+        BTN_ACTIVE_LOW      : boolean := false
     );
     Port (
         clk        : in  STD_LOGIC;
@@ -35,7 +36,29 @@ architecture Behavioral of HW_2 is
     constant N         : natural := PWM_BITS;
     constant TICK_DIV  : natural := CLK_FREQ_HZ / 1000;
     constant LEVEL_MAX : unsigned(N-1 downto 0) := (others => '1');  -- R = 2^N - 1
-    constant R_EXT     : unsigned(N downto 0)   := resize(LEVEL_MAX, N+1);
+    constant R_INT     : natural := 2**N - 1;
+    constant CYC       : natural := CYCLE_PERIODS;
+    constant HB        : natural := HOLD_BOTTOM_PERIODS;
+
+    --------------------------------------------------
+    -- 各 hold_sel 的時間分配（PWM 週期數，elaboration 時算好的常數）
+    --   CYC = RAMP_LEN × 2 + TOP_LEN + HB，四種選擇的週期都相同
+    --------------------------------------------------
+    type period_table_t is array (0 to 3) of natural;
+
+    -- 最亮停留佔週期的 0% / 25% / 50% / 75%
+    constant TOP_NOM : period_table_t :=
+        (0, (CYC * 25) / 100, (CYC * 50) / 100, (CYC * 75) / 100);
+
+    -- 單程斜坡長度（漸亮 = 漸暗）
+    constant RAMP_LEN : period_table_t :=
+        ((CYC - HB - TOP_NOM(0)) / 2, (CYC - HB - TOP_NOM(1)) / 2,
+         (CYC - HB - TOP_NOM(2)) / 2, (CYC - HB - TOP_NOM(3)) / 2);
+
+    -- 實際最亮停留，吸收除以 2 的餘數，確保總和剛好等於 CYC
+    constant TOP_LEN : period_table_t :=
+        (CYC - HB - 2 * RAMP_LEN(0), CYC - HB - 2 * RAMP_LEN(1),
+         CYC - HB - 2 * RAMP_LEN(2), CYC - HB - 2 * RAMP_LEN(3));
 
     --------------------------------------------------
     -- Gamma ROM（elaboration 時計算，gamma = 2.2）
@@ -64,11 +87,11 @@ architecture Behavioral of HW_2 is
     -- 亮度 FSM
     type breath_state_type is (UP, HOLD_TOP, DOWN, HOLD_BOTTOM);
     signal b_state   : breath_state_type := UP;
-    signal step_cnt  : integer range 0 to STEP_PERIODS - 1 := 0;
-    signal step_tick : std_logic;
+    signal sel_l     : integer range 0 to 3 := 0;      -- 本週期鎖存的 hold_sel
+    signal acc       : integer range 0 to CYC := 0;    -- DDA 累加器
+    signal dda_carry : std_logic;
     signal level     : unsigned(N-1 downto 0) := (others => '0');
-    signal hold_cnt  : unsigned(N downto 0) := (others => '0');
-    signal h_top     : unsigned(N downto 0) := (others => '0');
+    signal hold_cnt  : integer range 0 to CYC := 0;
     signal cycle_end : std_logic := '0';
 
     -- 按鈕：bit 0 = mode，1 = hold，2 = breath
@@ -87,6 +110,8 @@ architecture Behavioral of HW_2 is
     signal seq_idx : integer range 0 to 6 := 0;
     signal hue     : unsigned(10 downto 0) := (others => '0');  -- 0 ~ 1535
     signal hue_f   : unsigned(7 downto 0);
+    signal hue_cnt : integer range 0 to HUE_PERIODS - 1 := 0;
+    signal hue_tick : std_logic;
     signal c_r, c_g, c_b : unsigned(7 downto 0) := (others => '1');
 
     -- 資料路徑：混合 -> gamma -> duty 影子暫存器
@@ -107,6 +132,11 @@ architecture Behavioral of HW_2 is
     signal led_r_reg, led_g_reg, led_b_reg : std_logic := '0';
 
 begin
+
+    -- DDA 每個 PWM 週期最多走一步，斜坡不得短於 R 個週期
+    assert RAMP_LEN(3) >= R_INT
+        report "CYCLE_PERIODS too small: 75% hold leaves a ramp shorter than 2^PWM_BITS-1 periods"
+        severity failure;
 
     --------------------------------------------------
     -- 1. PWM 計數器
@@ -129,81 +159,89 @@ begin
     -- pwm_cnt 即將由 2^N-1 回到 0 的那一拍
     pwm_end <= '1' when div_cnt = PWM_DIV - 1 and pwm_cnt = LEVEL_MAX else '0';
 
-    -- 每 STEP_PERIODS 個 PWM 週期前進一階
-    step_tick <= '1' when pwm_end = '1' and step_cnt = STEP_PERIODS - 1 else '0';
-
 
     --------------------------------------------------
     -- 2. 亮度 FSM（三角波 + 停留 + 呼吸開關）
+    --    時間單位為 PWM 週期；斜坡以 DDA 讓 level 在 RAMP_LEN 個週期內
+    --    均勻走完 R 步，因此週期固定為 CYCLE_PERIODS，與最亮佔比無關
     --------------------------------------------------
+    dda_carry <= '1' when acc + R_INT >= RAMP_LEN(sel_l) else '0';
+
     process(clk)
     begin
         if rising_edge(clk) then
 
             if reset = '1' then
                 b_state   <= UP;
-                step_cnt  <= 0;
+                sel_l     <= 0;
+                acc       <= 0;
                 level     <= (others => '0');
-                hold_cnt  <= (others => '0');
-                h_top     <= (others => '0');
+                hold_cnt  <= 0;
                 cycle_end <= '0';
 
             else
                 cycle_end <= '0';
 
                 if pwm_end = '1' then
-                    if step_cnt = STEP_PERIODS - 1 then
-                        step_cnt <= 0;
-                    else
-                        step_cnt <= step_cnt + 1;
-                    end if;
-                end if;
-
-                if step_tick = '1' then
                     case b_state is
 
                         when UP =>
-                            level <= level + 1;
-                            if level = LEVEL_MAX - 1 then
-                                b_state  <= HOLD_TOP;
-                                hold_cnt <= (others => '0');
-                                -- 進入最亮時鎖存停留階數
-                                case hold_sel is
-                                    when "00"   => h_top <= (others => '0');
-                                    when "01"   => h_top <= shift_right(R_EXT, 1);   -- R/2
-                                    when "10"   => h_top <= R_EXT;                   -- R
-                                    when others => h_top <= shift_left(R_EXT, 1);    -- 2R
-                                end case;
+                            if dda_carry = '1' then
+                                acc   <= acc + R_INT - RAMP_LEN(sel_l);
+                                level <= level + 1;
+                                if level = LEVEL_MAX - 1 then
+                                    acc      <= 0;
+                                    hold_cnt <= 0;
+                                    if TOP_LEN(sel_l) = 0 and breath_en = '1' then
+                                        b_state <= DOWN;
+                                    else
+                                        b_state <= HOLD_TOP;
+                                    end if;
+                                end if;
+                            else
+                                acc <= acc + R_INT;
                             end if;
 
                         when HOLD_TOP =>
-                            if hold_cnt >= h_top then
-                                if breath_en = '1' then
-                                    b_state <= DOWN;
-                                    level   <= level - 1;
-                                end if;             -- 恆亮時停在這裡
-                            else
-                                hold_cnt <= hold_cnt + 1;
+                            if hold_cnt + 1 >= TOP_LEN(sel_l) and breath_en = '1' then
+                                b_state <= DOWN;
+                                acc     <= 0;
+                            elsif hold_cnt < TOP_LEN(sel_l) then
+                                hold_cnt <= hold_cnt + 1;   -- 恆亮時停在這裡（計數飽和）
                             end if;
 
                         when DOWN =>
                             if breath_en = '0' then
-                                b_state <= UP;      -- 關閉呼吸：轉回漸亮
-                            else
+                                acc <= 0;                   -- 關閉呼吸：轉回漸亮
+                                if level = LEVEL_MAX then
+                                    b_state  <= HOLD_TOP;
+                                    hold_cnt <= 0;
+                                else
+                                    b_state <= UP;
+                                end if;
+                            elsif dda_carry = '1' then
+                                acc   <= acc + R_INT - RAMP_LEN(sel_l);
                                 level <= level - 1;
                                 if level = 1 then
-                                    b_state   <= HOLD_BOTTOM;
-                                    hold_cnt  <= (others => '0');
-                                    cycle_end <= '1';   -- 亮度歸零，可換色
+                                    acc       <= 0;
+                                    hold_cnt  <= 0;
+                                    cycle_end <= '1';       -- 亮度歸零，可換色
+                                    if HB = 0 then
+                                        b_state <= UP;
+                                        sel_l   <= to_integer(hold_sel);  -- 新週期鎖存佔比
+                                    else
+                                        b_state <= HOLD_BOTTOM;
+                                    end if;
                                 end if;
+                            else
+                                acc <= acc + R_INT;
                             end if;
 
                         when HOLD_BOTTOM =>
-                            if breath_en = '0' then
+                            if breath_en = '0' or hold_cnt + 1 >= HB then
                                 b_state <= UP;
-                            elsif hold_cnt >= HOLD_BOTTOM_STEPS then
-                                b_state <= UP;
-                                level   <= level + 1;
+                                acc     <= 0;
+                                sel_l   <= to_integer(hold_sel);      -- 新週期鎖存佔比
                             else
                                 hold_cnt <= hold_cnt + 1;
                             end if;
@@ -387,6 +425,9 @@ begin
     --------------------------------------------------
     hue_f <= hue(7 downto 0);
 
+    -- 色輪每 HUE_PERIODS 個 PWM 週期前進一步
+    hue_tick <= '1' when pwm_end = '1' and hue_cnt = HUE_PERIODS - 1 else '0';
+
     process(clk)
     begin
         if rising_edge(clk) then
@@ -394,11 +435,20 @@ begin
             if reset = '1' then
                 seq_idx <= 0;
                 hue     <= (others => '0');
+                hue_cnt <= 0;
                 c_r     <= (others => '1');
                 c_g     <= (others => '1');
                 c_b     <= (others => '1');
 
             else
+                if pwm_end = '1' then
+                    if hue_cnt = HUE_PERIODS - 1 then
+                        hue_cnt <= 0;
+                    else
+                        hue_cnt <= hue_cnt + 1;
+                    end if;
+                end if;
+
                 -- 序列索引與色相
                 if short_p(0) = '1' or long_p(0) = '1' then
                     seq_idx <= 0;                   -- 切換模式時從紅色開始
@@ -412,7 +462,7 @@ begin
                         end if;
                     end if;
 
-                    if mode = "10" and step_tick = '1' then
+                    if mode = "10" and hue_tick = '1' then
                         if hue = 1535 then
                             hue <= (others => '0');
                         else

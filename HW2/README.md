@@ -28,12 +28,12 @@
 |---|---|---|---|
 | `clk` / `reset` | in | 1 | 系統時脈；同步 reset，高電位有效 |
 | `btn_mode` | in | 1 | 顏色模式：白光 → 序列 → 色輪 |
-| `btn_hold` | in | 1 | 最亮停留佔比：0% / 20% / 33% / 50% |
+| `btn_hold` | in | 1 | 最亮停留佔比：0% / 25% / 50% / 75%（呼吸週期固定不變） |
 | `btn_breath` | in | 1 | 呼吸／恆亮切換 |
 | `led_r` / `led_g` / `led_b` | out | 1 | PWM 輸出 |
 | `status` | out | 5 | `mode`(1:0)、`hold_sel`(3:2)、`breath_en`(4) |
 
-主要 generic：`CLK_FREQ_HZ`、`PWM_BITS`、`PWM_DIV`、`STEP_PERIODS`、`GAMMA_EN`、
+主要 generic：`CLK_FREQ_HZ`、`PWM_BITS`、`PWM_DIV`、`CYCLE_PERIODS`、`GAMMA_EN`、
 `LED_ACTIVE_LOW`、`BTN_ACTIVE_LOW` 等，預設值與說明見 SPEC §3.1。
 
 ## 檔案
@@ -42,7 +42,7 @@
 |---|---|
 | `SPEC.md` | 設計規格：參數計算、FSM、顏色與按鈕行為、驗證計畫 |
 | `src/HW_2.vhd` | 設計原始碼 |
-| `sim/HW_2_tb.vhd` | 測試檔（目前為空白範本，驗證項目規劃見 SPEC §9） |
+| `sim/HW_2_tb.vhd` | 自我檢查測試檔，涵蓋 SPEC §9 全部項目；`run all` 後印出 PASS / FAIL |
 | `Create-Project.tcl` | 由本目錄原始碼建立 Vivado 專案 |
 | `Import-FromVivado.ps1` | 從舊 Vivado 專案匯入 HW2 檔案 |
 | `docs/architecture.svg` | 架構圖 |
@@ -51,7 +51,7 @@
 
 - [x] 規格（`SPEC.md`）
 - [x] 設計原始碼（`src/HW_2.vhd`）
-- [ ] 測試檔：依 SPEC §9 補齊，模擬時覆寫 generic 縮短時間
+- [x] 測試檔（`sim/HW_2_tb.vhd`，xsim 2018.3 通過）
 - [ ] 約束檔：板子型號、時脈、LED 與按鈕腳位確認後建立 `constraints/`（見 SPEC §10）
 
 ## 使用

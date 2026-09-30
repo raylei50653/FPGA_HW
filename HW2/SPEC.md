@@ -62,8 +62,9 @@ flowchart LR
 | `CLK_FREQ_HZ` | natural | 100_000_000 | 系統時脈頻率（待確認板子） |
 | `PWM_BITS` | natural | 8 | PWM 解析度 N，duty 範圍 0 ~ 2^N−1 |
 | `PWM_DIV` | natural | 390 | PWM 計數器前除頻，每 `PWM_DIV` 個 clk 計數一次 |
-| `STEP_PERIODS` | natural | 4 | 亮度每前進一階所需的 PWM 週期數 |
-| `HOLD_BOTTOM_STEPS` | natural | 0 | 最暗點停留的階數 |
+| `CYCLE_PERIODS` | natural | 2048 | 呼吸週期（PWM 週期數），約 2.04 s；與最亮佔比無關 |
+| `HOLD_BOTTOM_PERIODS` | natural | 0 | 最暗點停留的 PWM 週期數 |
+| `HUE_PERIODS` | natural | 4 | 色輪每前進一步的 PWM 週期數 |
 | `GAMMA_EN` | boolean | true | 是否啟用 gamma 校正 |
 | `LED_ACTIVE_LOW` | boolean | false | LED 低電位點亮時設為 true（共陽極 RGB LED） |
 | （內部常數）`TICK_DIV` | — | `CLK_FREQ_HZ / 1000` | 1 ms 節拍的除頻值，模擬時改小 `CLK_FREQ_HZ` 即可縮短 |
@@ -115,36 +116,63 @@ duty  = duty_x / 2^PWM_BITS
 
 ### 5.1 線性三角波
 
-亮度等級 `level`（`PWM_BITS` bit）以上下計數器實作：
+時間單位為 PWM 週期（每個 `pwm_end` 更新一次）。一個呼吸週期固定為 `CYCLE_PERIODS`，
+分成四段：
+
+```text
+CYCLE_PERIODS = RAMP_LEN（漸亮） + TOP_LEN（最亮） + RAMP_LEN（漸暗） + HOLD_BOTTOM_PERIODS（最暗）
+```
+
+`TOP_LEN` 由最亮佔比決定（5.3），剩下的時間平分給漸亮與漸暗。所以佔比改變時，
+斜坡會跟著變快或變慢，**週期不變**。
 
 ```mermaid
 stateDiagram-v2
     [*] --> UP : reset
-    UP --> HOLD_TOP : level = 2^N−1<br/>取樣 hold_sel
-    HOLD_TOP --> DOWN : 停留 H_top 階<br/>且 breath_en = 1
-    DOWN --> HOLD_BOTTOM : level = 0<br/>並送出 cycle_end
+    UP --> HOLD_TOP : level = 2^N−1
+    UP --> DOWN : level = 2^N−1<br/>且 TOP_LEN = 0
+    HOLD_TOP --> DOWN : 停留 TOP_LEN 週期<br/>且 breath_en = 1
+    DOWN --> HOLD_BOTTOM : level = 0<br/>送出 cycle_end
+    DOWN --> UP : level = 0 且 HB = 0<br/>送出 cycle_end、鎖存 hold_sel
     DOWN --> UP : breath_en = 0
-    HOLD_BOTTOM --> UP : 停留 HOLD_BOTTOM_STEPS 階
+    HOLD_BOTTOM --> UP : 停留 HB 週期<br/>鎖存 hold_sel
     HOLD_BOTTOM --> UP : breath_en = 0
-    UP : level + 1
-    DOWN : level − 1
+    UP : DDA 進位時 level + 1
+    DOWN : DDA 進位時 level − 1
     HOLD_TOP : level 保持最大
     HOLD_BOTTOM : level 保持 0
 ```
 
-- 狀態：`UP`、`HOLD_TOP`、`DOWN`、`HOLD_BOTTOM` 四狀態 FSM，寫法與 HW1 一致。
-- 每累計 `STEP_PERIODS` 個 `pwm_end` 前進一階；停留狀態以 `hold_cnt`（N+1 bit）計數階數，
-  停留 0 階時直接轉移。
-- 亮度降到 0（進入 `HOLD_BOTTOM`）時產生一拍 `cycle_end`，供顏色控制換色。
+**斜坡：DDA（數位微分分析器）**
 
-呼吸週期（R = 2^N − 1 為單程階數，`H_top` 見 5.3）：
+斜坡要在 `RAMP_LEN` 個 PWM 週期內走完 R = 2^N − 1 步，每步不一定是整數個週期
+（例如 1024 / 255 ≈ 4.02）。以累加器 `acc` 做 Bresenham 式均勻分配，不需除法器：
 
 ```text
-T_breath = (2R + H_top + HOLD_BOTTOM_STEPS) × STEP_PERIODS / f_pwm
+每個 pwm_end：
+    if acc + R >= RAMP_LEN then  acc <= acc + R − RAMP_LEN;  level ± 1
+    else                         acc <= acc + R
 ```
 
-`hold_sel = 00`、`HOLD_BOTTOM_STEPS = 0` 時：510 × 4 / 1001.6 ≈ **2.04 s**。常見舒適範圍約 2 ~ 4 s，可調 `STEP_PERIODS`
-（每 +1 約增加 0.51 s）。
+- 從 `acc = 0`、`level = 0` 開始，第 k 個週期後 `level = ⌊k × R / RAMP_LEN⌋`，
+  第 `RAMP_LEN` 個週期剛好到達 R，所以漸亮與漸暗各精確佔 `RAMP_LEN` 個週期。
+- 每個週期最多走一步，因此要求 `RAMP_LEN ≥ R`；以 elaboration 時的 `assert` 檢查
+  （預設值最短的斜坡為 256 ≥ 255）。
+- 硬體：一個加法器、一個比較器、`acc` 暫存器；`RAMP_LEN` 是由 `sel_l` 選擇的常數。
+
+其他細節：
+
+- 狀態：`UP`、`HOLD_TOP`、`DOWN`、`HOLD_BOTTOM` 四狀態 FSM，寫法與 HW1 一致。
+- 停留狀態以 `hold_cnt` 計數 PWM 週期，停留 0 個週期時直接跳過該狀態。
+- 亮度降到 0 時產生一拍 `cycle_end`，供顏色控制換色。
+
+呼吸週期：
+
+```text
+T_breath = CYCLE_PERIODS / f_pwm = 2048 / 1001.6 ≈ 2.04 s（約 0.49 Hz）
+```
+
+常見舒適範圍約 2 ~ 4 s，調整 `CYCLE_PERIODS` 即可（例如 3072 ≈ 3.07 s、4096 ≈ 4.09 s）。
 
 ### 5.2 Gamma 校正
 
@@ -163,25 +191,28 @@ gamma(x) = round( (2^N − 1) × (x / (2^N − 1))^2.2 )
 
 ### 5.3 最大亮度時間佔比（`hold_sel`）
 
-在 `HOLD_TOP` 停留 `H_top` 階。停留階數以單程階數 R 的倍數定義，只需移位、不需乘法，
-改變 `PWM_BITS` 時佔比也不變：
+最亮停留 `TOP_LEN` 是週期的固定百分比。三張表（`TOP_NOM`、`RAMP_LEN`、`TOP_LEN`）都在
+elaboration 時由 generic 算成常數，硬體只是 4 選 1 的常數多工器：
 
 ```text
-D_top = H_top / (2R + H_top + HOLD_BOTTOM_STEPS)
+TOP_NOM(i)  = CYCLE_PERIODS × {0, 25, 50, 75}% 
+RAMP_LEN(i) = (CYCLE_PERIODS − HB − TOP_NOM(i)) / 2
+TOP_LEN(i)  = CYCLE_PERIODS − HB − 2 × RAMP_LEN(i)    -- 吸收除以 2 的餘數，總和剛好等於週期
 ```
 
-| `hold_sel` | `H_top` | N = 8 時階數 | 最亮佔比 D_top | 呼吸週期（預設） |
-|---|---|---|---|---|
-| `00` | 0 | 0 | 0% | 2.04 s |
-| `01` | R / 2 | 127 | 19.9% | 2.54 s |
-| `10` | R | 255 | 33.3% | 3.06 s |
-| `11` | 2R | 510 | 50.0% | 4.07 s |
+| `hold_sel` | 最亮佔比 | `TOP_LEN` | `RAMP_LEN`（單程） | 單程斜坡時間 | 呼吸週期 |
+|---|---|---|---|---|---|
+| `00` | 0% | 0 | 1024 | 1.02 s | 2.04 s |
+| `01` | 25% | 512 | 768 | 0.77 s | 2.04 s |
+| `10` | 50% | 1024 | 512 | 0.51 s | 2.04 s |
+| `11` | 75% | 1536 | 256 | 0.26 s | 2.04 s |
 
-（佔比與週期以 `HOLD_BOTTOM_STEPS = 0`、`STEP_PERIODS = 4` 計算。）
+（以預設 `CYCLE_PERIODS = 2048`、`HOLD_BOTTOM_PERIODS = 0` 計算。）
 
-- 佔比指「亮度停在最大值」的時間比例；漸亮與漸暗的速度不變，所以佔比越高週期越長。
-- `hold_sel` 只在進入 `HOLD_TOP` 的那一拍取樣並鎖存到 `H_top`，按鈕切換不會打斷正在進行的
-  停留，新值從下一次最亮開始生效。
+- 佔比指「亮度停在最大值」的時間比例；**週期固定，佔比越高斜坡越快**。
+- 百分比寫在 `TOP_NOM` 常數，要改成其他比例只需改這一行，不增加硬體。
+- `hold_sel` 在每個週期開始（離開最暗點）時鎖存到 `sel_l`，整個週期的漸亮、停留、
+  漸暗都用同一組長度；按鈕切換從下一個週期開始生效，不會讓當前週期變長或變短。
 
 ### 5.4 呼吸開關（`breath_en`）
 
@@ -190,10 +221,11 @@ D_top = H_top / (2R + H_top + HOLD_BOTTOM_STEPS)
 | `'1'` | 正常呼吸，依 5.1 循環 |
 | `'0'` | 恆亮：`level` 平滑升到最大後停在 `HOLD_TOP` |
 
-- 關閉時若在 `DOWN` 或 `HOLD_BOTTOM`，轉回 `UP` 繼續漸亮；若在 `UP` 則照常升到最大。
-  亮度不會跳變。
-- 關閉期間停在 `HOLD_TOP`，不產生 `cycle_end`；重新開啟後，停滿 `H_top` 階（已停留的
-  階數也算）即進入 `DOWN`。
+- 關閉時若在 `DOWN` 或 `HOLD_BOTTOM`，轉回 `UP` 繼續漸亮（`DOWN` 尚未走第一步、仍在最大值時
+  直接進 `HOLD_TOP`）；若在 `UP` 則照常升到最大。亮度不會跳變。
+- 關閉期間停在 `HOLD_TOP`，不產生 `cycle_end`；重新開啟後，停滿 `TOP_LEN` 個週期（已停留的
+  週期也算）即進入 `DOWN`。
+- 被關閉打斷的那個週期長度不固定；恢復後從下一個完整週期起，週期再回到 `CYCLE_PERIODS`。
 - 恆亮時顏色仍由 `mode` 決定：`01` 單色序列因沒有 `cycle_end` 而停在目前顏色；
   `10` 色輪照常旋轉。
 
@@ -227,8 +259,8 @@ duty_x = gamma(mix_x)              -- GAMMA_EN = true 時
 
 ### 6.3 色輪（HSV 色相，S = V = 最大）
 
-色相計數器 `hue`：0 ~ 1535（6 段 × 256），每個 `pwm_end` 前進一階（以 `STEP_PERIODS`
-控制速度），繞一圈約 1536 × 4 / 1001.6 ≈ 6.1 s。以 `seg = hue / 256`、`f = hue mod 256`
+色相計數器 `hue`：0 ~ 1535（6 段 × 256），每 `HUE_PERIODS` 個 PWM 週期前進一階
+（`hue_tick`），繞一圈約 1536 × 4 / 1001.6 ≈ 6.1 s。以 `seg = hue / 256`、`f = hue mod 256`
 分段線性產生 RGB，只需比較與加減、無乘法：
 
 | `seg` | R | G | B | 色相範圍 |
@@ -284,7 +316,7 @@ stateDiagram-v2
 | 設定 | 生效時機 | 理由 |
 |---|---|---|
 | `mode` | 下一個 `pwm_end`（立即） | 按下後需馬上看到變化；換色瞬間的跳變可接受 |
-| `hold_sel` | 下一次進入 `HOLD_TOP` | 避免停留中途被截斷或延長，見 5.3 |
+| `hold_sel` | 下一個呼吸週期開始 | 整個週期用同一組長度，週期不會被拉長或縮短，見 5.3 |
 | `breath_en` | 立即，依 5.4 平滑過渡 | FSM 本身保證亮度不跳變 |
 
 ### 7.4 狀態指示（`status`）
@@ -301,13 +333,14 @@ stateDiagram-v2
 
 ## 8. Reset 行為
 
-`reset = '1'` 時所有計數器歸零，`level = 0`，FSM 回到 `UP`，`H_top` 鎖存值清為 0，顏色索引與 `hue` 回到 0（紅色，
+`reset = '1'` 時所有計數器歸零，`level = 0`，FSM 回到 `UP`，`sel_l`、`acc` 清為 0，顏色索引與 `hue` 回到 0（紅色，
 `mode = 00` 時為白色），LED 輸出為熄滅電位。設定暫存器回到預設：`mode = 00`、
 `hold_sel = 00`、`breath_en = '1'`；按鈕 FSM 回到 `IDLE`。
 
 ## 9. 驗證計畫（`HW_2_tb`）
 
-模擬時覆寫 generic 以縮短時間，例如 `PWM_BITS = 4`、`PWM_DIV = 2`、`STEP_PERIODS = 1`、
+模擬時覆寫 generic 以縮短時間，例如 `PWM_BITS = 4`、`PWM_DIV = 2`、`CYCLE_PERIODS = 192`、
+`HOLD_BOTTOM_PERIODS = 16`、`HUE_PERIODS = 1`、
 `CLK_FREQ_HZ = 10_000`（1 ms = 10 clk）、`DEBOUNCE_MS = 3`、`LONG_PRESS_MS = 20`。
 
 | 項目 | 檢查方式 |
@@ -315,11 +348,12 @@ stateDiagram-v2
 | PWM 週期 | 量測 `led_r` 兩個上升緣間距 = `PWM_DIV × 2^N` 個 clk |
 | duty 正確 | 每個 PWM 週期的高電位 clk 數 = `PWM_DIV × duty_x` |
 | 無毛刺 | duty 只在 `pwm_end` 改變；單一週期內只有一次上升與下降 |
-| 三角波 | `level` 由 0 單調升至最大再單調降回 0，週期符合 5.1 公式 |
+| 三角波 | 亮度由 0 單調升至最大再單調降回 0 |
 | Gamma | `gamma(0) = 0`、`gamma(max) = max`、單調不減 |
 | 換色時機 | `mode = 01` 時顏色索引只在 `level = 0` 時改變 |
 | 色輪 | `hue` 每段交界 RGB 連續，無跳變 |
-| 最亮佔比 | 各 `hold_sel` 下 `HOLD_TOP` 持續階數符合 5.3 表格；停留中切換 `hold_sel` 不影響本次停留 |
+| 固定週期 | 四種 `hold_sel` 的呼吸週期都等於 `CYCLE_PERIODS` |
+| 最亮佔比 | 最亮持續週期數 = `TOP_LEN` + ⌈`RAMP_LEN` / R⌉（漸暗第一步前 level 仍為最大）；停留中切換 `hold_sel` 不影響本週期 |
 | 呼吸開關 | 在四個狀態下分別短按 `btn_breath` 關閉呼吸，`level` 都單調升到最大並保持；再按一次恢復循環 |
 | 極性 | `LED_ACTIVE_LOW = true` 時輸出反相 |
 | 去彈跳 | 按鈕輸入加入短於 `DEBOUNCE_MS` 的抖動脈衝，`btn_stable` 不變、不產生動作 |
