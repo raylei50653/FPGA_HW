@@ -81,11 +81,11 @@
 
   <!-- HW1 -->
   <rect class="box" x="660" y="150" width="170" height="120" rx="6"/>
-  <text class="t" x="745" y="174">HW1 雙計數器</text>
+  <text class="t" x="745" y="174">hw1 : HW_1_pwm</text>
   <text class="s" x="745" y="198">COUNT1：數 upbnd1 → 亮</text>
   <text class="s" x="745" y="218">COUNT2：數 upbnd2 → 暗</text>
-  <text class="s" x="745" y="238">交替 = PWM</text>
-  <text class="s" x="745" y="256">週期固定 MAX clk</text>
+  <text class="s" x="745" y="238">交替 = PWM，週期 MAX clk</text>
+  <text class="s" x="745" y="256">上限在週期開頭鎖存</text>
 
-  <text class="l" x="20" y="432">全部由同一個 clk 驅動；upbnd 只在 PWM 週期結束（pwm_end）時更新，上限為 0 的那一段直接跳過。</text>
+  <text class="l" x="20" y="432">HW1 為獨立 entity，由 top 實例化；upbnd 在 pwm_end 更新，HW1 於下一個週期開頭鎖存（延後一個 PWM 週期）；上限為 0 的一段直接跳過。</text>
 </svg>

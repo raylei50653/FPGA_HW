@@ -6,6 +6,7 @@ use IEEE.STD_LOGIC_1164.ALL;
 --   每 MAX 個 clk 為一個 PWM 週期，逐週期檢查：
 --     1. LED 在週期開頭連續亮 h 個 clk，其餘暗（單一脈波、無毛刺）
 --     2. h 依三角波 0, 1, ..., MAX, MAX-1, ..., 1, 0, 1, ... 變化，每階撐 STEP_PERIODS 個週期
+--        （HW1 在週期開頭鎖存上限，整體延後一個 PWM 週期）
 --     3. LED_ACTIVE_LOW 版本輸出恰為反相
 --   最後中途 reset，確認 LED 熄滅並從最暗重新開始
 entity HW_2_a_check_tb is
@@ -94,7 +95,12 @@ begin
         begin
             for p in 0 to periods - 1 loop
                 sample_period(p);
-                exp := level(p / STEP_PERIODS);
+                -- upbnd 在週期開頭才鎖進 HW1，所以亮度比 step 晚一個 PWM 週期
+                if p = 0 then
+                    exp := 0;
+                else
+                    exp := level((p - 1) / STEP_PERIODS);
+                end if;
                 check(h = exp, tag & " period " & integer'image(p) & ": high " &
                       integer'image(h) & " clk, expected " & integer'image(exp));
             end loop;

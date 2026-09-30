@@ -14,14 +14,15 @@
 
 ![HW2_a 架構圖](docs/architecture.svg)
 
-| 區塊 | 功能 | 原始碼區段 |
+| 區塊 | 功能 | 原始碼 |
 |---|---|---|
-| FSM1 | 變暗ing／變亮ing 兩狀態 Moore FSM，決定 `upbnd1`、`upbnd2` 往哪個方向走 | 1、2 |
-| `upbnd1` / `upbnd2` | 亮、暗兩段的上限，和固定為 `MAX`；每一階依 FSM1 狀態 `++` / `--` | 3 |
-| HW1 | 雙計數器 FSM：count1 數 `upbnd1` 個 clk（亮）、count2 數 `upbnd2` 個 clk（暗），交替進行即為 PWM | 4 – 7 |
-| PWM counter | 數 PWM 週期，撐滿 1/`STEP_HZ` 秒送出 `step`，讓亮度走一階 | 8 |
+| FSM1 | 變暗ing／變亮ing 兩狀態 Moore FSM，決定 `upbnd1`、`upbnd2` 往哪個方向走 | `HW_2_a.vhd` 區段 1、2 |
+| `upbnd1` / `upbnd2` | 亮、暗兩段的上限，和固定為 `MAX`；每一階依 FSM1 狀態 `++` / `--` | `HW_2_a.vhd` 區段 3 |
+| HW1 | 雙計數器 FSM：count1 數 `upbnd1` 個 clk（亮）、count2 數 `upbnd2` 個 clk（暗），交替進行即為 PWM；獨立 entity，由 `HW_2_a` 實例化為 `hw1` | `HW_1_pwm.vhd` |
+| PWM counter | 數 PWM 週期，撐滿 1/`STEP_HZ` 秒送出 `step`，讓亮度走一階 | `HW_2_a.vhd` 區段 5 |
 
-全部 process 由 `clk` 驅動，時序控制使用單拍致能脈衝（`pwm_end`、`step`），不產生衍生時脈。
+階層：`HW_2_a`（top）→ `hw1 : HW_1_pwm`。全部 process 由 `clk` 驅動，時序控制使用單拍致能脈衝
+（`pwm_end`、`step`），不產生衍生時脈。
 
 ## 3. 介面
 
@@ -67,10 +68,20 @@ stateDiagram-v2
 呼吸週期 = 2 × MAX / STEP_HZ = 2 × 30 / 30 = 2 s（單程 1 s）
 ```
 
-## 5. HW1 雙計數器 PWM
+## 5. HW1 雙計數器 PWM（`HW_1_pwm`）
 
 沿用 HW1 的寫法（狀態暫存器、下一狀態邏輯、count1、count2 分開撰寫），把固定的上限換成
-`upbnd1` / `upbnd2`：
+輸入 port `upbnd1` / `upbnd2`，做成獨立 entity 由 `HW_2_a` 實例化：
+
+| Port | 方向 | 說明 |
+|---|---|---|
+| `clk` / `reset` | in | 與 top 共用 |
+| `upbnd1` | in | 亮的 clk 數（0 ~ `MAX`） |
+| `upbnd2` | in | 暗的 clk 數（0 ~ `MAX`，須滿足 `upbnd1 + upbnd2 = MAX`） |
+| `led_on` | out | 目前在 `COUNT1_STATE`（亮） |
+| `pwm_end` | out | PWM 週期最後一拍 |
+
+Generic 只有 `MAX`（PWM 週期的 clk 數）。
 
 | 狀態 | 動作 | LED |
 |---|---|---|
@@ -84,9 +95,13 @@ duty     = upbnd1 / MAX                     （0 ~ 100%，共 MAX + 1 階）
 
 - **上限為 0 的那一段直接跳過**：`upbnd1 = 0` 時整個週期都在 `COUNT2_STATE`（全暗），
   `upbnd2 = 0` 時整個週期都在 `COUNT1_STATE`（全亮），週期仍是 `MAX`。
-- `pwm_end`：count2 數滿，或 `upbnd2 = 0` 時 count1 數滿，即 PWM 週期最後一拍。
-- **`upbnd` 只在 `pwm_end` 更新**（`step` 只會在 `pwm_end` 出現），一個 PWM 週期內亮暗長度不變，
-  不會產生殘缺脈波。週期結束時以更新後的 `upbnd1` 決定下一週期從亮或暗開始。
+- `pwm_end`：count2 數滿，或本週期 `upbnd2 = 0` 時 count1 數滿，即 PWM 週期最後一拍。
+- **影子暫存器**：`HW_1_pwm` 在 `pwm_end` 把 `upbnd1` / `upbnd2` 鎖進內部的 `b1` / `b2`，
+  整個週期只用這組值，一個 PWM 週期內亮暗長度不變，不會產生殘缺脈波；同一拍以即將鎖存的
+  `upbnd1` 決定下一週期從亮或暗開始。
+- **延遲一個 PWM 週期**：`step` 與 `pwm_end` 同拍，`upbnd` 在這一拍才更新，影子暫存器鎖到的是
+  更新前的值，所以新亮度在下一個 `pwm_end` 才生效（預設 300 ns，看不出來）。這樣 `HW_1_pwm`
+  只需要 `upbnd1` / `upbnd2` 兩個輸入，不必知道 FSM1 的內部訊號。
 - LED 直接由狀態暫存器產生（Moore 輸出），不經組合邏輯，沒有毛刺。
 - PWM 頻率由 `CLK_FREQ_HZ / MAX` 決定。若 LED 驅動電路跟不上 MHz 等級的切換，可加大 `MAX`
   （亮度階數變多、單程時間變長），或另加 clk 致能前除頻。
@@ -100,14 +115,14 @@ duty     = upbnd1 / MAX                     （0 ~ 100%，共 MAX + 1 階）
 ## 7. Reset 行為
 
 `reset = '1'` 時：FSM1 回到 `DIMMING`、`upbnd1 = 0`、`upbnd2 = MAX`；HW1 回到 `COUNT2_STATE`、
-count1 / count2 與 `pwm_cnt` 歸零；LED 為熄滅電位。放開 reset 的下一拍即是第一個 PWM 週期的開始。
+影子暫存器為 `b1 = 0`、`b2 = MAX`，count1 / count2 與 `pwm_cnt` 歸零；LED 為熄滅電位。放開 reset 的下一拍即是第一個 PWM 週期的開始。
 
 ## 8. 驗證計畫
 
 兩個測試檔使用相同的縮小參數：
 
 - `HW_2_a_tb`：看波形用（Vivado 專案的模擬 top，模擬時間 8100 ns）。只產生 clk / reset，
-  跑約 3 次呼吸；可在波形加入 DUT 內部的 `fsm1_state`、`upbnd1`、`upbnd2`、`hw1_state` 觀察。
+  跑約 3 次呼吸；可在波形加入 `uut` 的 `fsm1_state`、`upbnd1`、`upbnd2` 與 `uut/hw1` 的 `state`、`b1`、`b2` 觀察。
 - `HW_2_a_check_tb`：自我檢查，`run all` 後印出 PASS / FAIL，檢查項目見下表。
 
 模擬參數：`MAX = 8`、`STEP_HZ = 30`、`CLK_FREQ_HZ = 480`（`STEP_PERIODS = 2`）。
@@ -118,7 +133,7 @@ count1 / count2 與 `pwm_cnt` 歸零；LED 為熄滅電位。放開 reset 的下
 | Reset | reset 期間 LED 熄滅 |
 | 單一脈波 | 每個週期 LED 在開頭連續亮 h 個 clk、其餘暗，週期內只有一段亮 |
 | PWM 週期 | 以 `MAX` 個 clk 切窗，每窗的亮暗排列都正確，即週期固定為 `MAX` |
-| 三角波 | 第 p 個週期的 h = `level(p / STEP_PERIODS)`，`level` 為 0 → `MAX` → 0 的三角波，檢查兩次完整呼吸 |
+| 三角波 | 第 p 個週期（p ≥ 1）的 h = `level((p − 1) / STEP_PERIODS)`（HW1 鎖存延後一個週期，p = 0 為 0），`level` 為 0 → `MAX` → 0 的三角波，檢查兩次完整呼吸 |
 | 最亮／最暗 | 三角波中包含 h = `MAX`（全亮）與 h = 0（全暗）的週期 |
 | 極性 | `LED_ACTIVE_LOW` 版輸出恰為反相 |
 | 中途 reset | 漸亮途中 reset，LED 熄滅，放開後從最暗重新開始 |
