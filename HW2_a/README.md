@@ -40,7 +40,7 @@ Generic：`CLK_FREQ_HZ`、`MAX`、`STEP_HZ`、`LED_ACTIVE_LOW`，說明見 SPEC 
 | `SPEC.md` | 設計規格：FSM1、HW1 PWM、節拍計算、驗證計畫 |
 | `src/HW_2_a.vhd` | Top：FSM1、upbnd1 / upbnd2、PWM counter，實例化 HW1 |
 | `src/HW_1_pwm.vhd` | HW1 雙計數器改為 PWM（上限由 port 輸入） |
-| `sim/HW_2_a_tb.vhd` | 看波形用測試檔（專案模擬 top）：縮小參數跑約 3 次呼吸，模擬時間已設為 8100 ns |
+| `sim/HW_2_a_tb.vhd` | 看波形用測試檔（專案模擬 top）：縮小參數跑約 3 次呼吸，每階連續 3 個 PWM 週期，模擬時間已設為 11700 ns |
 | `sim/HW_2_a_check_tb.vhd` | 自我檢查測試檔，逐個 PWM 週期比對三角波；`run all` 後印出 PASS / FAIL |
 | `Create-Project.tcl` | 由本目錄原始碼建立 Vivado 專案 |
 | `docs/architecture.svg` | 架構圖 |
@@ -63,6 +63,6 @@ Generic：`CLK_FREQ_HZ`、`MAX`、`STEP_HZ`、`LED_ACTIVE_LOW`，說明見 SPEC 
 
 本版只存在於 Git，舊 Vivado 專案沒有對應檔案，不需要 `import`。
 
-模擬：Vivado 中 Run Behavioral Simulation 預設跑 `HW_2_a_tb`（8100 ns），可從 Scope 把 `uut` 內的
+模擬：Vivado 中 Run Behavioral Simulation 預設跑 `HW_2_a_tb`（11700 ns），可從 Scope 把 `uut` 內的
 `fsm1_state`、`upbnd1`、`upbnd2`，以及 `uut/hw1` 內的 `state`、`b1`、`b2` 拖進波形；要跑自我檢查時，把 sim_1 的 top 改成
 `HW_2_a_check_tb` 後執行 `run all`。

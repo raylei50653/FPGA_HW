@@ -2,7 +2,7 @@ library IEEE;
 use IEEE.STD_LOGIC_1164.ALL;
 
 -- HW2_a 自我檢查測試檔（看波形用 HW_2_a_tb）：run all 後印出 PASS / FAIL
---   以小參數模擬：MAX = 8、每階 2 個 PWM 週期
+--   以小參數模擬：MAX = 8、每階 3 個 PWM 週期
 --   每 MAX 個 clk 為一個 PWM 週期，逐週期檢查：
 --     1. LED 在週期開頭連續亮 h 個 clk，其餘暗（單一脈波、無毛刺）
 --     2. h 依三角波 0, 1, ..., MAX, MAX-1, ..., 1, 0, 1, ... 變化，每階撐 STEP_PERIODS 個週期
@@ -17,8 +17,8 @@ architecture sim of HW_2_a_check_tb is
     constant T            : time     := 10 ns;
     constant MAX          : positive := 8;
     constant STEP_HZ      : positive := 30;
-    constant STEP_PERIODS : positive := 2;
-    constant CLK_FREQ_HZ  : positive := STEP_HZ * MAX * STEP_PERIODS;   -- 480
+    constant STEP_PERIODS : positive := 3;
+    constant CLK_FREQ_HZ  : positive := STEP_HZ * MAX * STEP_PERIODS;   -- 720
     constant BREATHS      : positive := 2;                              -- 檢查兩次完整呼吸
 
     signal clk   : std_logic := '0';

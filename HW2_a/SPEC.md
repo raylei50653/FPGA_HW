@@ -121,11 +121,12 @@ duty     = upbnd1 / MAX                     （0 ~ 100%，共 MAX + 1 階）
 
 兩個測試檔使用相同的縮小參數：
 
-- `HW_2_a_tb`：看波形用（Vivado 專案的模擬 top，模擬時間 8100 ns）。只產生 clk / reset，
+- `HW_2_a_tb`：看波形用（Vivado 專案的模擬 top，模擬時間 11700 ns）。只產生 clk / reset，
   跑約 3 次呼吸；可在波形加入 `uut` 的 `fsm1_state`、`upbnd1`、`upbnd2` 與 `uut/hw1` 的 `state`、`b1`、`b2` 觀察。
 - `HW_2_a_check_tb`：自我檢查，`run all` 後印出 PASS / FAIL，檢查項目見下表。
 
-模擬參數：`MAX = 8`、`STEP_HZ = 30`、`CLK_FREQ_HZ = 480`（`STEP_PERIODS = 2`）。
+模擬參數：`MAX = 8`、`STEP_HZ = 30`、`CLK_FREQ_HZ = 720`（`STEP_PERIODS = 3`）：每個亮度連續 3 個 PWM 週期，
+例如 1/8 的脈波連續出現三次；一個 PWM 週期 80 ns，一次呼吸 16 × 3 × 80 ns = 3.84 µs。
 `HW_2_a_check_tb` 同時例化一般版與 `LED_ACTIVE_LOW = true` 版，每 `MAX` 個 clk 切成一個 PWM 週期逐一檢查：
 
 | 項目 | 檢查方式 |
