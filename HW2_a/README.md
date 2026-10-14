@@ -42,6 +42,7 @@ Generic：`CLK_FREQ_HZ`、`MAX`、`STEP_HZ`、`LED_ACTIVE_LOW`，說明見 SPEC 
 | `src/HW_1_pwm.vhd` | HW1 雙計數器改為 PWM（上限由 port 輸入） |
 | `sim/HW_2_a_tb.vhd` | 看波形用測試檔（專案模擬 top）：縮小參數跑約 3 次呼吸，每階連續 3 個 PWM 週期，模擬時間已設為 11700 ns |
 | `sim/HW_2_a_check_tb.vhd` | 自我檢查測試檔，逐個 PWM 週期比對三角波；`run all` 後印出 PASS / FAIL |
+| `constraints/HW_2_a.xdc` | EGO-XZ7 腳位檔 |
 | `Create-Project.tcl` | 由本目錄原始碼建立 Vivado 專案 |
 | `docs/architecture.svg` | 架構圖 |
 

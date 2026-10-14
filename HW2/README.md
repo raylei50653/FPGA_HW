@@ -5,7 +5,8 @@
 以 PWM 驅動 RGB LED，亮度依固定週期平滑地「漸亮 → 漸暗」循環，並可透過三顆按鈕
 切換顏色模式、最亮停留時間與呼吸／恆亮。完整規格與設計理由見 [`SPEC.md`](SPEC.md)。
 
-- 目標器件：`xc7k70tfbv676-1`（與 HW1 相同）
+- 目標板：e-elements EGO-XZ7（`xc7z020clg484-1`，100 MHz），腳位見 `constraints/HW_2.xdc`
+- 板上沒有 RGB LED：R / G / B 分別接 LD0 ~ LD2、`status` 接 LD3 ~ LD7；按鈕 reset = BTNC、mode = BTNU、hold = BTNL、breath = BTNR
 - Top 模組：`HW_2`，測試檔：`HW_2_tb`
 - 全同步設計、單一時脈域；時間參數皆為 generic，模擬時可縮短
 
@@ -47,6 +48,7 @@
 | `SPEC.md` | 設計規格：參數計算、FSM、顏色與按鈕行為、驗證計畫 |
 | `src/HW_2.vhd` | 設計原始碼 |
 | `sim/HW_2_tb.vhd` | 自我檢查測試檔，涵蓋 SPEC §9 全部項目；`run all` 後印出 PASS / FAIL |
+| `constraints/HW_2.xdc` | EGO-XZ7 腳位檔 |
 | `Create-Project.tcl` | 由本目錄原始碼建立 Vivado 專案 |
 | `Import-FromVivado.ps1` | 從舊 Vivado 專案匯入 HW2 檔案 |
 | `docs/architecture.svg` | 架構圖（各 process 功能） |
@@ -56,7 +58,7 @@
 - [x] 規格（`SPEC.md`）
 - [x] 設計原始碼（`src/HW_2.vhd`）
 - [x] 測試檔（`sim/HW_2_tb.vhd`，xsim 2018.3 通過）
-- [ ] 約束檔：板子型號、時脈、LED 與按鈕腳位確認後建立 `constraints/`（見 SPEC §10）
+- [x] 約束檔（`constraints/HW_2.xdc`，EGO-XZ7 腳位見 SPEC §10）
 
 ## 使用
 

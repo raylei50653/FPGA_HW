@@ -6,7 +6,7 @@
 設計為全同步電路，只有單一時脈域，所有時間參數皆以 generic 設定，方便在
 模擬時縮短時間。
 
-- 目標器件：`xc7k70tfbv676-1`（與 HW1 相同）
+- 目標板：e-elements EGO-XZ7（`xc7z020clg484-1`，100 MHz），腳位見 `constraints/HW_2.xdc`
 - 語言：VHDL（`ieee.numeric_std`）
 - Top 模組：`HW_2`，測試檔：`HW_2_tb`
 
@@ -36,7 +36,7 @@
 
 | 名稱 | 型別 | 預設值 | 說明 |
 |---|---|---|---|
-| `CLK_FREQ_HZ` | natural | 100_000_000 | 系統時脈頻率（待確認板子） |
+| `CLK_FREQ_HZ` | natural | 100_000_000 | 系統時脈頻率（EGO-XZ7 為 100 MHz） |
 | `PWM_BITS` | natural | 8 | PWM 解析度 N，duty 範圍 0 ~ 2^N−1 |
 | `PWM_DIV` | natural | 390 | PWM 計數器前除頻，每 `PWM_DIV` 個 clk 計數一次 |
 | `CYCLE_PERIODS` | natural | 2048 | 呼吸週期（PWM 週期數），約 2.04 s；與最亮佔比無關 |
@@ -314,7 +314,7 @@ stateDiagram-v2
 | `status(3 downto 2)` | `hold_sel` |
 | `status(4)` | `breath_en` |
 
-`status` 為一般電位輸出、不做 PWM；板上沒有空閒 LED 時可不接腳位。
+`status` 為一般電位輸出、不做 PWM；EGO-XZ7 上接 LD3 ~ LD7（見 §10）。
 
 ## 8. Reset 行為
 
@@ -347,10 +347,30 @@ stateDiagram-v2
 | 同時按 | 同時按下兩顆按鈕，兩項設定各自正確改變 |
 | 狀態指示 | `status` 與設定暫存器一致 |
 
-## 10. 待確認
+## 10. 腳位（EGO-XZ7）
 
-- 板子型號與時脈頻率（目前假設 100 MHz）。
-- LED 型式：單色 LED 或 RGB LED、共陽或共陰（決定 `LED_ACTIVE_LOW`）、腳位配置（XDC）。
-- 板上按鈕數量與極性（需 3 顆，加上 `reset` 共 4 顆；決定 `BTN_ACTIVE_LOW`）。
-- 板上是否有 5 顆空閒 LED 可接 `status`。
+`constraints/HW_2.xdc`，腳位與電壓取自 Vivado 內建 board file（`EGO-XZ7/1.1/part0_pins.xml`）。
+板上按鈕按下為高電位、LED 高電位點亮，所以 `BTN_ACTIVE_LOW`、`LED_ACTIVE_LOW` 都維持 `false`，
+設計不需修改。
+
+| Port | 板上元件 | 腳位 | IOSTANDARD |
+|---|---|---|---|
+| `clk` | System clock 100 MHz | Y9 | LVCMOS33 |
+| `reset` | BTNC（中） | P16 | LVCMOS25 |
+| `btn_mode` | BTNU（上） | T18 | LVCMOS25 |
+| `btn_hold` | BTNL（左） | N15 | LVCMOS25 |
+| `btn_breath` | BTNR（右） | R18 | LVCMOS25 |
+| `led_r` / `led_g` / `led_b` | LD0 / LD1 / LD2 | T22 / T21 / U22 | LVCMOS33 |
+| `status(0)` ~ `status(4)` | LD3 ~ LD7 | U21 / V22 / W22 / U19 / U14 | LVCMOS33 |
+
+**板上沒有 RGB LED**：R、G、B 三個通道分別接三顆單色 LED，看到的是三顆燈各自呼吸，不會混色：
+
+| `mode` | LD0 ~ LD2 的樣子 |
+|---|---|
+| `00` 白光 | 三顆同步呼吸 |
+| `01` 單色序列 | 每次呼吸換一組亮的燈：LD0 → LD0+LD1 → LD1 → LD1+LD2 → LD2 → LD0+LD2 → 三顆 → … |
+| `10` 色輪 | 三顆一邊呼吸、一邊依色相輪流變亮變暗（相位各差 1/3 圈） |
+
+## 11. 待確認
+
 - 作業是否指定呼吸週期、PWM 頻率或解析度。
