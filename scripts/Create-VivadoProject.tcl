@@ -52,6 +52,10 @@ foreach extension {vhd vhdl v sv} {
 }
 if {[llength $simulation_files] > 0} {
     add_files -norecurse -fileset sim_1 $simulation_files
+    # A homework's Create-Project.tcl may set sim_vhdl2008 when its testbench uses VHDL-2008 features.
+    if {[info exists sim_vhdl2008] && $sim_vhdl2008} {
+        set_property file_type {VHDL 2008} [get_files -of_objects [get_filesets sim_1] *.vhd]
+    }
     set_property top HW_${homework_number}${homework_suffix}_tb [get_filesets sim_1]
     if {[info exists sim_runtime]} {
         set_property -name {xsim.simulate.runtime} -value $sim_runtime -objects [get_filesets sim_1]

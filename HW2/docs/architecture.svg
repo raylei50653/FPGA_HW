@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 680" width="1280" height="680" role="img" aria-label="HW2 RGB 呼吸燈架構圖：各 process 功能">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 680" width="1280" height="680" role="img" aria-label="HW2 8 顆 LED 呼吸燈架構圖：各 process 功能">
   <style>
     .box { fill: #f6f8fa; stroke: #8c959f; stroke-width: 1.2; }
     .io  { fill: #ddf4ff; stroke: #54aeff; stroke-width: 1.2; }
@@ -29,44 +29,41 @@
     <path d="M130 46 H170"/>
     <path d="M130 88 H170"/>
     <path d="M130 130 H170"/>
-    <!-- ④ -> ⑤ -> status -->
+    <!-- ④ -> ⑤ -->
     <path d="M390 88 H480"/>
-    <path d="M680 88 H1160"/>
     <!-- ⑤ -> ② / ⑥ -->
-    <path d="M510 126 V190 H330 V230"/>
-    <path d="M620 126 V230"/>
+    <path d="M510 126 V190 H305 V230"/>
+    <path d="M650 126 V230"/>
     <!-- ③ -> ④ -->
     <path d="M85 200 V180 H250 V160"/>
-    <!-- ② -> ⑥ / ⑦ -->
-    <path d="M440 260 H520"/>
-    <path d="M320 340 V445 H360"/>
-    <!-- ⑥ -> ⑦ -->
-    <path d="M645 340 V410"/>
-    <!-- ⑦ -> ⑧ -> LED -->
-    <path d="M920 445 H960"/>
-    <path d="M1130 445 H1160"/>
+    <!-- ② -> ⑥ -->
+    <path d="M440 285 H520"/>
+    <!-- ⑥ -> ⑦ -> ⑧ -> LED -->
+    <path d="M595 340 V410"/>
+    <path d="M720 445 H800"/>
+    <path d="M1010 445 H1090"/>
     <!-- clk -> ① / ③ -->
     <path d="M150 585 H190"/>
     <path d="M85 565 V260"/>
-    <!-- ① -> ② / ⑦ / ⑧ -->
+    <!-- ① -> ② / ⑥ / ⑦ / ⑧ -->
     <path d="M250 550 V340"/>
-    <path d="M410 570 H845 V480"/>
-    <path d="M410 600 H1045 V480"/>
+    <path d="M410 565 H760 V340"/>
+    <path d="M410 590 H595 V480"/>
+    <path d="M410 610 H905 V480"/>
   </g>
 
   <!-- 連線標籤 -->
   <text class="l" x="435" y="78" text-anchor="middle">短按 / 長按</text>
-  <text class="l" x="920" y="80" text-anchor="middle">目前設定</text>
-  <text class="l" x="420" y="184" text-anchor="middle">停留佔比 · 呼吸開關</text>
-  <text class="l" x="628" y="176">顏色模式</text>
+  <text class="l" x="400" y="184" text-anchor="middle">停留佔比 · 呼吸開關</text>
+  <text class="l" x="658" y="166">模式：基礎 / 流水 → / 流水 ←</text>
   <text class="l" x="160" y="174">1 ms 節拍</text>
-  <text class="l" x="480" y="252" text-anchor="middle">週期結束</text>
-  <text class="l" x="328" y="400">亮度</text>
-  <text class="l" x="653" y="380">顏色 C</text>
-  <text class="l" x="940" y="437" text-anchor="middle">duty</text>
+  <text class="l" x="480" y="277" text-anchor="middle">亮度</text>
+  <text class="l" x="603" y="380">下一週期 duty ×8</text>
+  <text class="l" x="760" y="437" text-anchor="middle">duty ×8</text>
   <text class="l" x="242" y="400" text-anchor="end">週期結束點</text>
-  <text class="l" x="600" y="562" text-anchor="middle">週期結束點（duty 更新時機）</text>
-  <text class="l" x="700" y="592" text-anchor="middle">計數值</text>
+  <text class="l" x="768" y="400">週期結束點（寫入、讀出時機）</text>
+  <text class="l" x="500" y="582" text-anchor="middle">週期結束點（duty 更新時機）</text>
+  <text class="l" x="700" y="602" text-anchor="middle">計數值</text>
 
   <!-- 輸入 / 輸出 -->
   <rect class="io" x="20" y="30" width="110" height="32" rx="16"/>
@@ -77,10 +74,8 @@
   <text class="p" x="75" y="135">btn_breath</text>
   <rect class="io" x="20" y="565" width="130" height="40" rx="20"/>
   <text class="p" x="85" y="590">clk / reset</text>
-  <rect class="io" x="1160" y="68" width="100" height="40" rx="20"/>
-  <text class="p" x="1210" y="93">status</text>
-  <rect class="io" x="1160" y="425" width="100" height="40" rx="20"/>
-  <text class="p" x="1210" y="450">led_r/g/b</text>
+  <rect class="io" x="1090" y="425" width="150" height="40" rx="20"/>
+  <text class="p" x="1165" y="450">led(7:0)</text>
 
   <!-- ③ 1 ms 節拍 -->
   <rect class="box" x="20" y="200" width="130" height="60" rx="6"/>
@@ -103,30 +98,30 @@
 
   <!-- ② 亮度 FSM -->
   <rect class="box" x="170" y="230" width="270" height="110" rx="6"/>
-  <text class="t" x="305" y="252">② 亮度 FSM</text>
+  <text class="t" x="305" y="252">② 亮度 FSM（主波形）</text>
   <text class="s" x="305" y="272">漸亮 → 最亮停留 → 漸暗 → 最暗</text>
   <text class="s" x="305" y="290">呼吸週期固定約 2 s</text>
   <text class="s" x="305" y="308">最亮停留佔 0 / 25 / 50 / 75 %</text>
   <text class="s" x="305" y="326">關閉呼吸時停在最亮（恆亮）</text>
 
-  <!-- ⑥ 顏色控制 -->
-  <rect class="box" x="520" y="230" width="250" height="110" rx="6"/>
-  <text class="t" x="645" y="252">⑥ 顏色控制</text>
-  <text class="s" x="645" y="272">依模式決定目前顏色 C</text>
-  <text class="s" x="645" y="290">白光 / 七色序列 / HSV 色輪</text>
-  <text class="s" x="645" y="308">序列：亮度歸零時換下一色</text>
-  <text class="s" x="645" y="326">色輪：隨時間平滑轉動色相</text>
+  <!-- ⑥ 流水延遲線 -->
+  <rect class="box" x="520" y="230" width="380" height="110" rx="6"/>
+  <text class="t" x="710" y="252">⑥ 流水延遲線</text>
+  <text class="s" x="710" y="272">每個 PWM 週期把亮度存進歷史 RAM（Block RAM）</text>
+  <text class="s" x="710" y="290">基礎：8 顆都讀最新一筆 → 同步呼吸</text>
+  <text class="s" x="710" y="308">流水：LD k 讀 k × 1/8 週期前的亮度（反向時 7 − k）</text>
+  <text class="s" x="710" y="326">讀出後經 Gamma 校正（γ = 2.2）</text>
 
-  <!-- ⑦ 資料路徑 -->
-  <rect class="box" x="360" y="410" width="560" height="70" rx="6"/>
-  <text class="t" x="640" y="436">⑦ 資料路徑 ×3</text>
-  <text class="s" x="640" y="458">顏色 × 亮度 → Gamma 校正（γ = 2.2） → 只在 PWM 週期交界更新 duty</text>
+  <!-- ⑦ duty 影子暫存器 -->
+  <rect class="box" x="470" y="410" width="250" height="70" rx="6"/>
+  <text class="t" x="595" y="436">⑦ duty 影子暫存器 ×8</text>
+  <text class="s" x="595" y="458">只在 PWM 週期交界更新</text>
 
   <!-- ⑧ 比較器與輸出 -->
-  <rect class="box" x="960" y="410" width="170" height="70" rx="6"/>
-  <text class="t" x="1045" y="436">⑧ 比較器與輸出</text>
-  <text class="s" x="1045" y="458">計數值 &lt; duty 時點亮</text>
-  <text class="s" x="1045" y="474">依 LED 極性輸出</text>
+  <rect class="box" x="800" y="410" width="210" height="70" rx="6"/>
+  <text class="t" x="905" y="436">⑧ 比較器與輸出 ×8</text>
+  <text class="s" x="905" y="458">計數值 &lt; duty 時點亮</text>
+  <text class="s" x="905" y="474">依 LED 極性輸出</text>
 
   <!-- ① PWM 計數器 -->
   <rect class="box" x="190" y="550" width="220" height="70" rx="6"/>
@@ -136,5 +131,5 @@
 
   <!-- 註解 -->
   <text class="l" x="20" y="654">每個方塊對應 src/HW_2.vhd 中一個編號區段的 process；全部由同一個 clk 驅動，不產生衍生時脈。</text>
-  <text class="l" x="20" y="672">PWM 週期結束點也提供給 ⑥ 做色輪步進，圖中省略；RGB 三通道共用 ①–⑥，⑦、⑧ 各有 ×3 份。</text>
+  <text class="l" x="20" y="672">8 顆 LED 共用 ①–⑥ 與同一條主波形，只有讀歷史 RAM 的延遲不同；⑦、⑧ 各有 ×8 份。</text>
 </svg>

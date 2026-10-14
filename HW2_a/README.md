@@ -8,7 +8,7 @@
 
 - 目標板：e-elements EGO-XZ7（`xc7z020clg484-1`，100 MHz），腳位見 `constraints/HW_2_a.xdc`
 - Top 模組：`HW_2_a`，測試檔：`HW_2_a_tb`（看波形）、`HW_2_a_check_tb`（自我檢查）
-- 另一版（RGB、按鈕、Gamma）見 [`../HW2`](../HW2/README.md)
+- 另一版（8 顆 LED、按鈕切換基礎／流水、Gamma）見 [`../HW2`](../HW2/README.md)
 
 ## 架構
 

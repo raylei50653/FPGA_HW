@@ -3,7 +3,8 @@ use IEEE.STD_LOGIC_1164.ALL;
 use IEEE.NUMERIC_STD.ALL;
 use IEEE.MATH_REAL.ALL;
 
--- HW2 呼吸燈（規格見 HW2/SPEC.md）
+-- HW2 8 顆 LED 呼吸燈（規格見 HW2/SPEC.md）
+--   mode 00 基礎：8 顆同步呼吸；01 流水 LD0 -> LD7；10 流水 LD7 -> LD0
 entity HW_2 is
     Generic (
         CLK_FREQ_HZ         : natural := 100_000_000; -- 系統時脈，同時決定 1 ms 節拍
@@ -11,7 +12,6 @@ entity HW_2 is
         PWM_DIV             : natural := 390;         -- PWM 前除頻
         CYCLE_PERIODS       : natural := 2048;        -- 呼吸週期（PWM 週期數），約 2.04 s
         HOLD_BOTTOM_PERIODS : natural := 0;           -- 最暗停留（PWM 週期數）
-        HUE_PERIODS         : natural := 4;           -- 色輪每步的 PWM 週期數
         GAMMA_EN            : boolean := true;
         LED_ACTIVE_LOW      : boolean := false;
         DEBOUNCE_MS         : natural := 20;
@@ -24,10 +24,7 @@ entity HW_2 is
         btn_mode   : in  STD_LOGIC;
         btn_hold   : in  STD_LOGIC;
         btn_breath : in  STD_LOGIC;
-        led_r      : out STD_LOGIC;
-        led_g      : out STD_LOGIC;
-        led_b      : out STD_LOGIC;
-        status     : out STD_LOGIC_VECTOR(4 downto 0)
+        led        : out STD_LOGIC_VECTOR(7 downto 0)
     );
 end HW_2;
 
@@ -39,6 +36,7 @@ architecture Behavioral of HW_2 is
     constant R_INT     : natural := 2**N - 1;
     constant CYC       : natural := CYCLE_PERIODS;
     constant HB        : natural := HOLD_BOTTOM_PERIODS;
+    constant LEDS      : natural := 8;
 
     --------------------------------------------------
     -- 各 hold_sel 的時間分配（PWM 週期數，elaboration 時算好的常數）
@@ -93,12 +91,44 @@ architecture Behavioral of HW_2 is
         return true;
     end function;
 
-    -- PWM
-    signal div_cnt  : integer range 0 to PWM_DIV - 1 := 0;
-    signal pwm_cnt  : unsigned(N-1 downto 0) := (others => '0');
-    signal pwm_end  : std_logic;
+    --------------------------------------------------
+    -- 流水延遲：LD k 顯示 k × FLOW_STEP 個 PWM 週期前的亮度
+    --   相鄰兩顆差 1/8 個呼吸週期，8 顆剛好排滿一個週期
+    --------------------------------------------------
+    constant FLOW_STEP : natural := CYC / LEDS;
+    constant MAX_OFF   : natural := (LEDS - 1) * FLOW_STEP;
 
-    -- 亮度 FSM
+    function clog2(n : natural) return natural is
+        variable r : natural := 0;
+    begin
+        while 2**r < n loop
+            r := r + 1;
+        end loop;
+        return r;
+    end function;
+
+    constant HIST_BITS : natural := clog2(MAX_OFF + 1);   -- 歷史 RAM 深度 2^HIST_BITS > MAX_OFF
+
+    type off_table_t is array (0 to LEDS - 1) of natural;
+
+    function gen_offsets return off_table_t is
+        variable t : off_table_t;
+    begin
+        for k in 0 to LEDS - 1 loop
+            t(k) := k * FLOW_STEP;
+        end loop;
+        return t;
+    end function;
+
+    constant OFFSETS : off_table_t := gen_offsets;
+
+    -- PWM
+    signal div_cnt   : integer range 0 to PWM_DIV - 1 := 0;
+    signal pwm_cnt   : unsigned(N-1 downto 0) := (others => '0');
+    signal pwm_end   : std_logic;
+    signal pwm_end_d : std_logic := '0';    -- pwm_end 延遲一拍：level 已更新
+
+    -- 亮度 FSM（主波形，8 顆 LED 共用）
     type breath_state_type is (UP, HOLD_TOP, DOWN, HOLD_BOTTOM);
     signal b_state   : breath_state_type := UP;
     signal sel_l     : integer range 0 to 3 := 0;      -- 本週期鎖存的 hold_sel
@@ -106,7 +136,6 @@ architecture Behavioral of HW_2 is
     signal dda_carry : std_logic;
     signal level     : unsigned(N-1 downto 0) := (others => '0');
     signal hold_cnt  : integer range 0 to CYC := 0;
-    signal cycle_end : std_logic := '0';
 
     -- 按鈕：bit 0 = mode，1 = hold，2 = breath
     signal tick_cnt : integer range 0 to TICK_DIV - 1 := 0;
@@ -120,18 +149,26 @@ architecture Behavioral of HW_2 is
     signal hold_sel  : unsigned(1 downto 0) := "00";
     signal breath_en : std_logic := '1';
 
-    -- 顏色
-    signal seq_idx : integer range 0 to 6 := 0;
-    signal hue     : unsigned(10 downto 0) := (others => '0');  -- 0 ~ 1535
-    signal hue_f   : unsigned(7 downto 0);
-    signal hue_cnt : integer range 0 to HUE_PERIODS - 1 := 0;
-    signal hue_tick : std_logic;
-    signal c_r, c_g, c_b : unsigned(7 downto 0) := (others => '1');
+    -- 流水延遲線：每個 PWM 週期寫入一筆 level，再依序讀出 8 顆 LED 的值
+    type hist_ram_t is array (0 to 2**HIST_BITS - 1) of unsigned(N-1 downto 0);
+    signal hist_ram  : hist_ram_t := (others => (others => '0'));
+    signal hist_we   : std_logic;
+    signal wr_ptr    : unsigned(HIST_BITS-1 downto 0) := (others => '0');
+    signal base      : unsigned(HIST_BITS-1 downto 0) := (others => '0');  -- 本週期剛寫入的位址
+    signal fill      : integer range 0 to MAX_OFF + 1 := 0;               -- reset 後已寫入筆數（飽和）
+    signal rd_busy   : std_logic := '0';
+    signal rd_k      : integer range 0 to LEDS - 1 := 0;
+    signal rd_off    : integer range 0 to MAX_OFF;
+    signal rd_addr   : unsigned(HIST_BITS-1 downto 0);
+    signal hist_q    : unsigned(N-1 downto 0) := (others => '0');
+    signal q_valid   : std_logic := '0';
+    signal q_k       : integer range 0 to LEDS - 1 := 0;
+    signal q_ok      : std_logic := '0';                                  -- 讀到的位址 reset 後已寫過
 
-    -- 資料路徑：混合 -> gamma -> duty 影子暫存器
-    signal mix_r, mix_g, mix_b    : unsigned(N-1 downto 0) := (others => '0');
-    signal gam_r, gam_g, gam_b    : unsigned(N-1 downto 0) := (others => '0');
-    signal duty_r, duty_g, duty_b : unsigned(N-1 downto 0) := (others => '0');
+    -- gamma 後的 duty：下一週期的值與目前週期的影子暫存器
+    type duty_array_t is array (0 to LEDS - 1) of unsigned(N-1 downto 0);
+    signal duty_nxt : duty_array_t := (others => (others => '0'));
+    signal duty     : duty_array_t := (others => (others => '0'));
 
     -- LED 熄滅電位
     function led_level(on_s : boolean) return std_logic is
@@ -143,7 +180,7 @@ architecture Behavioral of HW_2 is
         end if;
     end function;
 
-    signal led_r_reg, led_g_reg, led_b_reg : std_logic := '0';
+    signal led_reg : std_logic_vector(LEDS - 1 downto 0) := (others => '0');
 
 begin
 
@@ -158,6 +195,16 @@ begin
 
     assert gamma_ok(GAMMA_ROM)
         report "GAMMA_ROM must satisfy gamma(0) = 0, gamma(max) = max and be non-decreasing"
+        severity failure;
+
+    -- 流水相鄰兩顆至少差一個 PWM 週期
+    assert FLOW_STEP >= 1
+        report "CYCLE_PERIODS must be at least 8 for the flowing modes"
+        severity failure;
+
+    -- 延遲線每個 PWM 週期需約 11 個 clk 讀完 8 顆，必須在下一個 pwm_end 前完成
+    assert PWM_DIV * 2**N >= 16
+        report "PWM period too short: PWM_DIV * 2^PWM_BITS must be at least 16 clocks"
         severity failure;
 
     --------------------------------------------------
@@ -199,11 +246,8 @@ begin
                 acc       <= 0;
                 level     <= (others => '0');
                 hold_cnt  <= 0;
-                cycle_end <= '0';
 
             else
-                cycle_end <= '0';
-
                 if pwm_end = '1' then
                     case b_state is
 
@@ -245,9 +289,8 @@ begin
                                 acc   <= acc + R_INT - RAMP_LEN(sel_l);
                                 level <= level - 1;
                                 if level = 1 then
-                                    acc       <= 0;
-                                    hold_cnt  <= 0;
-                                    cycle_end <= '1';       -- 亮度歸零，可換色
+                                    acc      <= 0;
+                                    hold_cnt <= 0;
                                     if HB = 0 then
                                         b_state <= UP;
                                         sel_l   <= to_integer(hold_sel);  -- 新週期鎖存佔比
@@ -439,88 +482,87 @@ begin
         end if;
     end process;
 
-    status <= breath_en & std_logic_vector(hold_sel) & std_logic_vector(mode);
-
 
     --------------------------------------------------
-    -- 6. 顏色控制
+    -- 6. 流水延遲線：歷史 RAM -> gamma -> duty_nxt
+    --    pwm_end 後一拍把新的 level 寫入 RAM，接著 8 拍依序讀出
+    --    LD k 的位址 base - 偏移（00 偏移 0；01 為 k 格；10 為 7 - k 格）
     --------------------------------------------------
-    hue_f <= hue(7 downto 0);
+    hist_we <= '1' when pwm_end_d = '1' else '0';
 
-    -- 色輪每 HUE_PERIODS 個 PWM 週期前進一步
-    hue_tick <= '1' when pwm_end = '1' and hue_cnt = HUE_PERIODS - 1 else '0';
+    with mode select rd_off <=
+        OFFSETS(rd_k)            when "01",
+        OFFSETS(LEDS - 1 - rd_k) when "10",
+        0                        when others;
+
+    rd_addr <= base - to_unsigned(rd_off, HIST_BITS);
+
+    -- 單埠寫、同步讀，推論為 Block RAM
+    process(clk)
+    begin
+        if rising_edge(clk) then
+            if hist_we = '1' then
+                hist_ram(to_integer(wr_ptr)) <= level;
+            end if;
+            hist_q <= hist_ram(to_integer(rd_addr));
+        end if;
+    end process;
 
     process(clk)
     begin
         if rising_edge(clk) then
 
+            pwm_end_d <= pwm_end;
+            q_valid   <= '0';
+
             if reset = '1' then
-                seq_idx <= 0;
-                hue     <= (others => '0');
-                hue_cnt <= 0;
-                c_r     <= (others => '1');
-                c_g     <= (others => '1');
-                c_b     <= (others => '1');
+                wr_ptr   <= (others => '0');
+                base     <= (others => '0');
+                fill     <= 0;
+                rd_busy  <= '0';
+                rd_k     <= 0;
+                q_k      <= 0;
+                q_ok     <= '0';
+                duty_nxt <= (others => (others => '0'));
 
             else
-                if pwm_end = '1' then
-                    if hue_cnt = HUE_PERIODS - 1 then
-                        hue_cnt <= 0;
+                -- 寫入：level 在 pwm_end 更新，下一拍存進 RAM
+                if hist_we = '1' then
+                    base    <= wr_ptr;
+                    wr_ptr  <= wr_ptr + 1;
+                    rd_busy <= '1';
+                    rd_k    <= 0;
+                    if fill <= MAX_OFF then
+                        fill <= fill + 1;
+                    end if;
+
+                -- 讀出：每拍一顆，RAM 資料下一拍出來
+                elsif rd_busy = '1' then
+                    q_valid <= '1';
+                    q_k     <= rd_k;
+                    -- reset 後還沒寫到的位址當作 0，避免 RAM 殘留舊資料
+                    if rd_off < fill then
+                        q_ok <= '1';
                     else
-                        hue_cnt <= hue_cnt + 1;
+                        q_ok <= '0';
+                    end if;
+                    if rd_k = LEDS - 1 then
+                        rd_busy <= '0';
+                    else
+                        rd_k <= rd_k + 1;
                     end if;
                 end if;
 
-                -- 序列索引與色相
-                if short_p(0) = '1' or long_p(0) = '1' then
-                    seq_idx <= 0;                   -- 切換模式時從紅色開始
-                    hue     <= (others => '0');
-                else
-                    if mode = "01" and cycle_end = '1' then
-                        if seq_idx = 6 then
-                            seq_idx <= 0;
-                        else
-                            seq_idx <= seq_idx + 1;
-                        end if;
-                    end if;
-
-                    if mode = "10" and hue_tick = '1' then
-                        if hue = 1535 then
-                            hue <= (others => '0');
-                        else
-                            hue <= hue + 1;
-                        end if;
+                -- gamma 查表後存成下一週期的 duty
+                if q_valid = '1' then
+                    if q_ok = '0' then
+                        duty_nxt(q_k) <= (others => '0');
+                    elsif GAMMA_EN then
+                        duty_nxt(q_k) <= GAMMA_ROM(to_integer(hist_q));
+                    else
+                        duty_nxt(q_k) <= hist_q;
                     end if;
                 end if;
-
-                -- 目前顏色 C = (c_r, c_g, c_b)
-                case mode is
-
-                    when "01" =>                    -- 單色序列
-                        case seq_idx is
-                            when 0      => c_r <= x"FF"; c_g <= x"00"; c_b <= x"00";  -- 紅
-                            when 1      => c_r <= x"FF"; c_g <= x"FF"; c_b <= x"00";  -- 黃
-                            when 2      => c_r <= x"00"; c_g <= x"FF"; c_b <= x"00";  -- 綠
-                            when 3      => c_r <= x"00"; c_g <= x"FF"; c_b <= x"FF";  -- 青
-                            when 4      => c_r <= x"00"; c_g <= x"00"; c_b <= x"FF";  -- 藍
-                            when 5      => c_r <= x"FF"; c_g <= x"00"; c_b <= x"FF";  -- 洋紅
-                            when others => c_r <= x"FF"; c_g <= x"FF"; c_b <= x"FF";  -- 白
-                        end case;
-
-                    when "10" =>                    -- 色輪，255 - f = not f
-                        case hue(10 downto 8) is
-                            when "000"  => c_r <= x"FF";      c_g <= hue_f;      c_b <= x"00";
-                            when "001"  => c_r <= not hue_f;  c_g <= x"FF";      c_b <= x"00";
-                            when "010"  => c_r <= x"00";      c_g <= x"FF";      c_b <= hue_f;
-                            when "011"  => c_r <= x"00";      c_g <= not hue_f;  c_b <= x"FF";
-                            when "100"  => c_r <= hue_f;      c_g <= x"00";      c_b <= x"FF";
-                            when others => c_r <= x"FF";      c_g <= x"00";      c_b <= not hue_f;
-                        end case;
-
-                    when others =>                  -- 固定白光
-                        c_r <= x"FF"; c_g <= x"FF"; c_b <= x"FF";
-
-                end case;
             end if;
 
         end if;
@@ -528,63 +570,36 @@ begin
 
 
     --------------------------------------------------
-    -- 7. 資料路徑：顏色混合 -> gamma -> duty 影子暫存器
+    -- 7. duty 影子暫存器：只在 PWM 週期交界更新
     --------------------------------------------------
     process(clk)
     begin
         if rising_edge(clk) then
-
-            -- (C × level) >> 8，8×N 乘法器
-            mix_r <= resize(shift_right(c_r * level, 8), N);
-            mix_g <= resize(shift_right(c_g * level, 8), N);
-            mix_b <= resize(shift_right(c_b * level, 8), N);
-
-            -- gamma 查表
-            if GAMMA_EN then
-                gam_r <= GAMMA_ROM(to_integer(mix_r));
-                gam_g <= GAMMA_ROM(to_integer(mix_g));
-                gam_b <= GAMMA_ROM(to_integer(mix_b));
-            else
-                gam_r <= mix_r;
-                gam_g <= mix_g;
-                gam_b <= mix_b;
-            end if;
-
-            -- duty 只在 PWM 週期交界更新
             if reset = '1' then
-                duty_r <= (others => '0');
-                duty_g <= (others => '0');
-                duty_b <= (others => '0');
+                duty <= (others => (others => '0'));
             elsif pwm_end = '1' then
-                duty_r <= gam_r;
-                duty_g <= gam_g;
-                duty_b <= gam_b;
+                duty <= duty_nxt;
             end if;
-
         end if;
     end process;
 
 
     --------------------------------------------------
-    -- 8. 比較器與輸出暫存器
+    -- 8. 比較器與輸出暫存器 ×8
     --------------------------------------------------
     process(clk)
     begin
         if rising_edge(clk) then
-            if reset = '1' then
-                led_r_reg <= led_level(false);
-                led_g_reg <= led_level(false);
-                led_b_reg <= led_level(false);
-            else
-                led_r_reg <= led_level(pwm_cnt < duty_r);
-                led_g_reg <= led_level(pwm_cnt < duty_g);
-                led_b_reg <= led_level(pwm_cnt < duty_b);
-            end if;
+            for k in 0 to LEDS - 1 loop
+                if reset = '1' then
+                    led_reg(k) <= led_level(false);
+                else
+                    led_reg(k) <= led_level(pwm_cnt < duty(k));
+                end if;
+            end loop;
         end if;
     end process;
 
-    led_r <= led_r_reg;
-    led_g <= led_g_reg;
-    led_b <= led_b_reg;
+    led <= led_reg;
 
 end Behavioral;
