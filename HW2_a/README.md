@@ -6,7 +6,7 @@
 `upbnd1` / `upbnd2`；HW1 的雙計數器 FSM 以這兩個上限交替計數，數 count1 時 LED 亮，
 形成 PWM。完整規格見 [`SPEC.md`](SPEC.md)。
 
-- 目標器件：`xc7k70tfbv676-1`（與 HW1 相同）
+- 目標板：e-elements EGO-XZ7（`xc7z020clg484-1`，100 MHz），腳位見 `constraints/HW_2_a.xdc`
 - Top 模組：`HW_2_a`，測試檔：`HW_2_a_tb`（看波形）、`HW_2_a_check_tb`（自我檢查）
 - 另一版（RGB、按鈕、Gamma）見 [`../HW2`](../HW2/README.md)
 
@@ -50,7 +50,7 @@ Generic：`CLK_FREQ_HZ`、`MAX`、`STEP_HZ`、`LED_ACTIVE_LOW`，說明見 SPEC 
 - [x] 規格（`SPEC.md`）
 - [x] 設計原始碼（`src/HW_2_a.vhd`、`src/HW_1_pwm.vhd`）
 - [x] 測試檔（`HW_2_a_tb` 看波形、`HW_2_a_check_tb` 自我檢查，xsim 2018.3 通過）
-- [ ] 約束檔：板子型號、時脈、LED 腳位確認後建立 `constraints/`（見 SPEC §9）
+- [x] 約束檔（`constraints/HW_2_a.xdc`，EGO-XZ7：clk = Y9、reset = BTNC、led = LD0）
 
 ## 使用
 

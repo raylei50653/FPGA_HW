@@ -8,6 +8,10 @@ if {![info exists homework]} {
 if {$homework eq ""} {
     set homework HW1
 }
+# A homework's Create-Project.tcl may set part to target a different board.
+if {![info exists part]} {
+    set part xc7k70tfbv676-1
+}
 if {![regexp {^HW([1-9][0-9]*)(_[a-z]+)?$} $homework -> homework_number homework_suffix]} {
     error "Expected a homework name such as HW1 or HW2_a."
 }
@@ -36,7 +40,7 @@ if {[llength $source_files] == 0} {
     error "No design source found in $source_dir"
 }
 
-create_project $homework $project_dir -part xc7k70tfbv676-1
+create_project $homework $project_dir -part $part
 add_files -norecurse -fileset sources_1 $source_files
 set_property top HW_${homework_number}${homework_suffix} [get_filesets sources_1]
 

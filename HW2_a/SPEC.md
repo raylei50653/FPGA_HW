@@ -5,7 +5,7 @@
 依課堂白板架構實作單色呼吸燈：以兩狀態 FSM（FSM1）控制亮暗比例，並重用 HW1 的
 雙計數器 FSM 產生 PWM。全同步設計、單一時脈域，時間參數皆為 generic。
 
-- 目標器件：`xc7k70tfbv676-1`（與 HW1 相同）
+- 目標板：e-elements EGO-XZ7（`xc7z020clg484-1`，100 MHz），腳位見 `constraints/HW_2_a.xdc`
 - 語言：VHDL（`ieee.numeric_std`）
 - Top 模組：`HW_2_a`，測試檔：`HW_2_a_tb`（看波形）、`HW_2_a_check_tb`（自我檢查）
 - 另一版（RGB、按鈕、Gamma）見 [`../HW2`](../HW2/SPEC.md)
@@ -30,7 +30,7 @@
 
 | 名稱 | 型別 | 預設值 | 說明 |
 |---|---|---|---|
-| `CLK_FREQ_HZ` | positive | 100_000_000 | 系統時脈頻率（待確認板子） |
+| `CLK_FREQ_HZ` | positive | 100_000_000 | 系統時脈頻率（EGO-XZ7 為 100 MHz） |
 | `MAX` | positive | 30 | 亮度階數，也是 PWM 週期的 clk 數（`upbnd1 + upbnd2`） |
 | `STEP_HZ` | positive | 30 | 每 1/`STEP_HZ` 秒亮度走一階 |
 | `LED_ACTIVE_LOW` | boolean | false | LED 低電位點亮時設為 true |
@@ -139,8 +139,17 @@ duty     = upbnd1 / MAX                     （0 ~ 100%，共 MAX + 1 階）
 | 極性 | `LED_ACTIVE_LOW` 版輸出恰為反相 |
 | 中途 reset | 漸亮途中 reset，LED 熄滅，放開後從最暗重新開始 |
 
-## 9. 待確認
+## 9. 腳位（EGO-XZ7）
 
-- 板子型號與時脈頻率（目前假設 100 MHz）。
-- LED 極性與腳位（XDC）；LED 驅動能否承受 `CLK_FREQ_HZ / MAX` 的 PWM 頻率。
+`constraints/HW_2_a.xdc`，腳位與電壓取自 Vivado 內建 board file（`EGO-XZ7/1.1/part0_pins.xml`）：
+
+| Port | 板上元件 | 腳位 | IOSTANDARD | 備註 |
+|---|---|---|---|---|
+| `clk` | System clock | Y9 | LVCMOS33 | 100 MHz，`create_clock -period 10` |
+| `reset` | 中間按鈕 BTNC | P16 | LVCMOS25 | 按下為高電位 |
+| `led` | LD0 | T22 | LVCMOS33 | 高電位點亮，`LED_ACTIVE_LOW = false` |
+
+## 10. 待確認
+
+- LED 驅動能否承受 `CLK_FREQ_HZ / MAX` 的 PWM 頻率（約 3.33 MHz）。
 - `MAX`、`STEP_HZ` 是否有作業指定值（白板為每階撐 1/30 s）。
