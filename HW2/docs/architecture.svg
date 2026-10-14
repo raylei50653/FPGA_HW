@@ -1,135 +1,280 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 680" width="1280" height="680" role="img" aria-label="HW2 8 顆 LED 呼吸燈架構圖：各 process 功能">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 620" width="1280" height="620" role="img" aria-label="HW2 8 顆 LED 呼吸燈架構圖：按鈕 → 設定 → 主波形 → 延遲線 → PWM → 8 顆 LED">
   <style>
-    .box { fill: #f6f8fa; stroke: #8c959f; stroke-width: 1.2; }
-    .io  { fill: #ddf4ff; stroke: #54aeff; stroke-width: 1.2; }
+    .box  { fill: #f6f8fa; stroke: #8c959f; stroke-width: 1.2; }
+    .chip { fill: #ffffff; stroke: #8c959f; stroke-width: 1; }
+    .on   { fill: #ddf4ff; stroke: #54aeff; stroke-width: 1.2; }
+    .btn  { fill: #ffffff; stroke: #59636e; stroke-width: 1.4; }
+    .off  { fill: none; stroke: #8c959f; stroke-width: 1; stroke-dasharray: 3 3; }
     .t { font: 600 14px "Noto Sans TC", "Microsoft JhengHei", "PingFang TC", sans-serif; fill: #1f2328; text-anchor: middle; }
-    .p { font: 600 13px ui-monospace, "Cascadia Code", Consolas, monospace; fill: #1f2328; text-anchor: middle; }
+    .b { font: 600 11px "Noto Sans TC", "Microsoft JhengHei", "PingFang TC", sans-serif; fill: #1f2328; text-anchor: middle; }
     .s { font: 11px "Noto Sans TC", "Microsoft JhengHei", "PingFang TC", sans-serif; fill: #59636e; text-anchor: middle; }
     .l { font: 11px "Noto Sans TC", "Microsoft JhengHei", "PingFang TC", sans-serif; fill: #59636e; }
-    .e { fill: none; stroke: #59636e; stroke-width: 1.4; }
-    .ah { fill: #59636e; }
+    .m { font: 10px ui-monospace, "Cascadia Code", Consolas, monospace; fill: #59636e; }
+    .e    { fill: none; stroke: #59636e; stroke-width: 1.4; }
+    .ah   { fill: #59636e; }
+    .axis { fill: none; stroke: #8c959f; stroke-width: 1; stroke-dasharray: 4 3; }
+    .wave { fill: none; stroke: #0969da; stroke-width: 2; stroke-linejoin: round; }
+    .hold { fill: none; stroke: #0969da; stroke-width: 4; stroke-linecap: round; }
+    .cell { fill: #0969da; }
+    .grid { fill: none; stroke: #8c959f; stroke-width: 1; }
+    .led  { fill: #d4a72c; }
+    .ring { fill: none; stroke: #8c959f; stroke-width: 1; }
     @media (prefers-color-scheme: dark) {
-      .box { fill: #161b22; stroke: #3d444d; }
-      .io  { fill: #0d2a4d; stroke: #1f6feb; }
-      .t, .p { fill: #e6edf3; }
-      .s, .l { fill: #9198a1; }
-      .e { stroke: #9198a1; }
-      .ah { fill: #9198a1; }
+      .box  { fill: #161b22; stroke: #3d444d; }
+      .chip { fill: #0d1117; stroke: #3d444d; }
+      .on   { fill: #0d2a4d; stroke: #1f6feb; }
+      .btn  { fill: #0d1117; stroke: #9198a1; }
+      .off  { stroke: #3d444d; }
+      .t, .b { fill: #e6edf3; }
+      .s, .l, .m { fill: #9198a1; }
+      .e, .axis, .grid, .ring { stroke: #9198a1; }
+      .ah   { fill: #9198a1; }
+      .wave, .hold { stroke: #4493f8; }
+      .cell { fill: #4493f8; }
+      .led  { fill: #e3b341; }
     }
   </style>
   <defs>
     <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
       <path class="ah" d="M0,0 L10,5 L0,10 z"/>
     </marker>
+    <!-- 三個週期的三角波，供 8 顆 LED 各自平移 -->
+    <polyline id="w" class="wave" points="0,18 75,2 150,18 225,2 300,18 375,2 450,18"/>
   </defs>
 
-  <!-- 連線 -->
-  <g class="e" marker-end="url(#a)">
-    <!-- 按鈕 -> ④ -->
-    <path d="M130 46 H170"/>
-    <path d="M130 88 H170"/>
-    <path d="M130 130 H170"/>
-    <!-- ④ -> ⑤ -->
-    <path d="M390 88 H480"/>
-    <!-- ⑤ -> ② / ⑥ -->
-    <path d="M510 126 V190 H305 V230"/>
-    <path d="M650 126 V230"/>
-    <!-- ③ -> ④ -->
-    <path d="M85 200 V180 H250 V160"/>
-    <!-- ② -> ⑥ -->
-    <path d="M440 285 H520"/>
-    <!-- ⑥ -> ⑦ -> ⑧ -> LED -->
-    <path d="M595 340 V410"/>
-    <path d="M720 445 H800"/>
-    <path d="M1010 445 H1090"/>
-    <!-- clk -> ① / ③ -->
-    <path d="M150 585 H190"/>
-    <path d="M85 565 V260"/>
-    <!-- ① -> ② / ⑥ / ⑦ / ⑧ -->
-    <path d="M250 550 V340"/>
-    <path d="M410 565 H760 V340"/>
-    <path d="M410 590 H595 V480"/>
-    <path d="M410 610 H905 V480"/>
+  <!-- ===================== 第一列：按鈕 → 按鈕處理 → 設定 ===================== -->
+
+  <!-- 板上按鈕（十字排列，與 EGO-XZ7 實際位置相同） -->
+  <rect class="box" x="20" y="40" width="220" height="200" rx="6"/>
+  <text class="t" x="130" y="62">板上按鈕</text>
+  <circle class="btn" cx="130" cy="96" r="22"/>
+  <text class="m" x="130" y="92" text-anchor="middle">S5</text>
+  <text class="b" x="130" y="106">模式</text>
+  <circle class="btn" cx="78" cy="148" r="22"/>
+  <text class="m" x="78" y="144" text-anchor="middle">S7</text>
+  <text class="b" x="78" y="158">停留</text>
+  <circle class="btn" cx="130" cy="148" r="22"/>
+  <text class="m" x="130" y="144" text-anchor="middle">S6</text>
+  <text class="b" x="130" y="158">reset</text>
+  <circle class="btn" cx="182" cy="148" r="22"/>
+  <text class="m" x="182" y="144" text-anchor="middle">S8</text>
+  <text class="b" x="182" y="158">呼吸</text>
+  <circle class="off" cx="130" cy="200" r="22"/>
+  <text class="m" x="130" y="196" text-anchor="middle">S9</text>
+  <text class="s" x="130" y="210">未用</text>
+
+  <!-- ③④ 按鈕處理 -->
+  <rect class="box" x="290" y="90" width="200" height="116" rx="6"/>
+  <text class="t" x="390" y="114">③④ 按鈕處理 ×3</text>
+  <text class="s" x="390" y="138">同步 → 去彈跳 20 ms</text>
+  <text class="s" x="390" y="160">放開 → 短按：換下一項</text>
+  <text class="s" x="390" y="182">按滿 1 s → 長按：回預設</text>
+
+  <!-- ⑤ 設定 -->
+  <rect class="box" x="540" y="40" width="300" height="196" rx="6"/>
+  <text class="t" x="690" y="64">⑤ 三個設定</text>
+
+  <text class="b" x="572" y="103">模式</text>
+  <rect class="on"   x="600" y="88" width="66" height="22" rx="11"/><text class="s" x="633" y="103">基礎</text>
+  <rect class="chip" x="674" y="88" width="66" height="22" rx="11"/><text class="s" x="707" y="103">流水 →</text>
+  <rect class="chip" x="748" y="88" width="66" height="22" rx="11"/><text class="s" x="781" y="103">流水 ←</text>
+
+  <text class="b" x="572" y="148">停留</text>
+  <rect class="on"   x="600" y="133" width="50" height="22" rx="11"/><text class="s" x="625" y="148">0%</text>
+  <rect class="chip" x="658" y="133" width="50" height="22" rx="11"/><text class="s" x="683" y="148">25%</text>
+  <rect class="chip" x="716" y="133" width="50" height="22" rx="11"/><text class="s" x="741" y="148">50%</text>
+  <rect class="chip" x="774" y="133" width="50" height="22" rx="11"/><text class="s" x="799" y="148">75%</text>
+
+  <text class="b" x="572" y="193">呼吸</text>
+  <rect class="on"   x="600" y="178" width="66" height="22" rx="11"/><text class="s" x="633" y="193">呼吸</text>
+  <rect class="chip" x="674" y="178" width="66" height="22" rx="11"/><text class="s" x="707" y="193">恆亮</text>
+
+  <text class="s" x="690" y="224">藍底 = 預設 · 短按換下一個 · 長按回預設</text>
+
+  <!-- 三種模式：某一瞬間 8 顆 LED 的亮度 -->
+  <rect class="box" x="880" y="40" width="380" height="200" rx="6"/>
+  <text class="t" x="1070" y="62">某一瞬間 8 顆 LED 的亮度</text>
+
+  <text class="b" x="896" y="99" text-anchor="start">基礎</text>
+  <text class="l" x="896" y="113">8 顆一樣</text>
+  <g>
+    <circle class="led" cx="1000" cy="95" r="11" fill-opacity="0.6"/>
+    <circle class="led" cx="1032" cy="95" r="11" fill-opacity="0.6"/>
+    <circle class="led" cx="1064" cy="95" r="11" fill-opacity="0.6"/>
+    <circle class="led" cx="1096" cy="95" r="11" fill-opacity="0.6"/>
+    <circle class="led" cx="1128" cy="95" r="11" fill-opacity="0.6"/>
+    <circle class="led" cx="1160" cy="95" r="11" fill-opacity="0.6"/>
+    <circle class="led" cx="1192" cy="95" r="11" fill-opacity="0.6"/>
+    <circle class="led" cx="1224" cy="95" r="11" fill-opacity="0.6"/>
   </g>
 
-  <!-- 連線標籤 -->
-  <text class="l" x="435" y="78" text-anchor="middle">短按 / 長按</text>
-  <text class="l" x="400" y="184" text-anchor="middle">停留佔比 · 呼吸開關</text>
-  <text class="l" x="658" y="166">模式：基礎 / 流水 → / 流水 ←</text>
-  <text class="l" x="160" y="174">1 ms 節拍</text>
-  <text class="l" x="480" y="277" text-anchor="middle">亮度</text>
-  <text class="l" x="603" y="380">下一週期 duty ×8</text>
-  <text class="l" x="760" y="437" text-anchor="middle">duty ×8</text>
-  <text class="l" x="242" y="400" text-anchor="end">週期結束點</text>
-  <text class="l" x="768" y="400">週期結束點（寫入、讀出時機）</text>
-  <text class="l" x="500" y="582" text-anchor="middle">週期結束點（duty 更新時機）</text>
-  <text class="l" x="700" y="602" text-anchor="middle">計數值</text>
+  <text class="b" x="896" y="154" text-anchor="start">流水 →</text>
+  <text class="l" x="896" y="168">亮點往 LD7 走</text>
+  <g>
+    <circle class="led" cx="1000" cy="150" r="11" fill-opacity="1"/>
+    <circle class="led" cx="1032" cy="150" r="11" fill-opacity="0.75"/>
+    <circle class="led" cx="1064" cy="150" r="11" fill-opacity="0.5"/>
+    <circle class="led" cx="1096" cy="150" r="11" fill-opacity="0.25"/>
+    <circle class="led" cx="1128" cy="150" r="11" fill-opacity="0.08"/>
+    <circle class="led" cx="1160" cy="150" r="11" fill-opacity="0.25"/>
+    <circle class="led" cx="1192" cy="150" r="11" fill-opacity="0.5"/>
+    <circle class="led" cx="1224" cy="150" r="11" fill-opacity="0.75"/>
+  </g>
 
-  <!-- 輸入 / 輸出 -->
-  <rect class="io" x="20" y="30" width="110" height="32" rx="16"/>
-  <text class="p" x="75" y="51">btn_mode</text>
-  <rect class="io" x="20" y="72" width="110" height="32" rx="16"/>
-  <text class="p" x="75" y="93">btn_hold</text>
-  <rect class="io" x="20" y="114" width="110" height="32" rx="16"/>
-  <text class="p" x="75" y="135">btn_breath</text>
-  <rect class="io" x="20" y="565" width="130" height="40" rx="20"/>
-  <text class="p" x="85" y="590">clk / reset</text>
-  <rect class="io" x="1090" y="425" width="150" height="40" rx="20"/>
-  <text class="p" x="1165" y="450">led(7:0)</text>
+  <text class="b" x="896" y="209" text-anchor="start">流水 ←</text>
+  <text class="l" x="896" y="223">亮點往 LD0 走</text>
+  <g>
+    <circle class="led" cx="1000" cy="205" r="11" fill-opacity="0.75"/>
+    <circle class="led" cx="1032" cy="205" r="11" fill-opacity="0.5"/>
+    <circle class="led" cx="1064" cy="205" r="11" fill-opacity="0.25"/>
+    <circle class="led" cx="1096" cy="205" r="11" fill-opacity="0.08"/>
+    <circle class="led" cx="1128" cy="205" r="11" fill-opacity="0.25"/>
+    <circle class="led" cx="1160" cy="205" r="11" fill-opacity="0.5"/>
+    <circle class="led" cx="1192" cy="205" r="11" fill-opacity="0.75"/>
+    <circle class="led" cx="1224" cy="205" r="11" fill-opacity="1"/>
+  </g>
+  <text class="m" x="1000" y="233" text-anchor="middle">LD0</text>
+  <text class="m" x="1224" y="233" text-anchor="middle">LD7</text>
 
-  <!-- ③ 1 ms 節拍 -->
-  <rect class="box" x="20" y="200" width="130" height="60" rx="6"/>
-  <text class="t" x="85" y="224">③ 1 ms 節拍</text>
-  <text class="s" x="85" y="244">按鈕計時的時間基準</text>
+  <!-- ===================== 第二列：主波形 → 延遲線 → PWM → LED ===================== -->
 
-  <!-- ④ 按鈕介面 -->
-  <rect class="box" x="170" y="30" width="220" height="130" rx="6"/>
-  <text class="t" x="280" y="54">④ 按鈕介面 ×3</text>
-  <text class="s" x="280" y="80">同步：消除亞穩態、統一極性</text>
-  <text class="s" x="280" y="100">去彈跳：穩定 20 ms 才接受</text>
-  <text class="s" x="280" y="120">放開 = 短按</text>
-  <text class="s" x="280" y="140">按滿 1 s = 長按</text>
+  <!-- ② 主波形 -->
+  <rect class="box" x="20" y="290" width="360" height="250" rx="6"/>
+  <text class="t" x="200" y="314">② 主波形（8 顆共用）</text>
+  <text class="l" x="44" y="364" text-anchor="end">亮</text>
+  <text class="l" x="44" y="464" text-anchor="end">暗</text>
+  <path class="axis" d="M50 460 H350 M50 360 H350"/>
+  <polyline class="wave" points="50,460 140,360 210,360 300,460 350,460"/>
+  <path class="hold" d="M140 360 H210"/>
+  <text class="l" x="175" y="350" text-anchor="middle">恆亮時停在這裡</text>
+  <text class="s" x="95" y="480">漸亮</text>
+  <text class="s" x="175" y="480">最亮停留</text>
+  <text class="s" x="255" y="480">漸暗</text>
+  <text class="s" x="325" y="480">最暗</text>
+  <path class="grid" d="M50 492 V502 M50 497 H350 M350 492 V502"/>
+  <text class="s" x="200" y="518">一個呼吸週期 ≈ 2 s（固定）</text>
+  <text class="s" x="200" y="533">停留佔比越大，漸亮漸暗越快</text>
 
-  <!-- ⑤ 設定暫存器 -->
-  <rect class="box" x="480" y="50" width="200" height="76" rx="6"/>
-  <text class="t" x="580" y="74">⑤ 設定暫存器</text>
-  <text class="s" x="580" y="94">保存模式、停留佔比、呼吸開關</text>
-  <text class="s" x="580" y="112">短按切下一項 · 長按回預設</text>
+  <!-- ⑥ 延遲線 -->
+  <rect class="box" x="420" y="290" width="320" height="250" rx="6"/>
+  <text class="t" x="580" y="314">⑥ 延遲線：流水的關鍵</text>
+  <text class="s" x="580" y="332">每個 PWM 週期把亮度存一格（Block RAM）</text>
+  <text class="l" x="440" y="347">最新</text>
+  <text class="l" x="720" y="347" text-anchor="end">越右越舊 →</text>
+  <g>
+    <rect class="cell" x="440"   y="352" width="17.5" height="26" fill-opacity="1"/>
+    <rect class="cell" x="457.5" y="352" width="17.5" height="26" fill-opacity="0.875"/>
+    <rect class="cell" x="475"   y="352" width="17.5" height="26" fill-opacity="0.75"/>
+    <rect class="cell" x="492.5" y="352" width="17.5" height="26" fill-opacity="0.625"/>
+    <rect class="cell" x="510"   y="352" width="17.5" height="26" fill-opacity="0.5"/>
+    <rect class="cell" x="527.5" y="352" width="17.5" height="26" fill-opacity="0.375"/>
+    <rect class="cell" x="545"   y="352" width="17.5" height="26" fill-opacity="0.25"/>
+    <rect class="cell" x="562.5" y="352" width="17.5" height="26" fill-opacity="0.165"/>
+    <rect class="cell" x="580"   y="352" width="17.5" height="26" fill-opacity="0.08"/>
+    <rect class="cell" x="597.5" y="352" width="17.5" height="26" fill-opacity="0.165"/>
+    <rect class="cell" x="615"   y="352" width="17.5" height="26" fill-opacity="0.25"/>
+    <rect class="cell" x="632.5" y="352" width="17.5" height="26" fill-opacity="0.375"/>
+    <rect class="cell" x="650"   y="352" width="17.5" height="26" fill-opacity="0.5"/>
+    <rect class="cell" x="667.5" y="352" width="17.5" height="26" fill-opacity="0.625"/>
+    <rect class="cell" x="685"   y="352" width="17.5" height="26" fill-opacity="0.75"/>
+    <rect class="cell" x="702.5" y="352" width="17.5" height="26" fill-opacity="0.875"/>
+  </g>
+  <path class="grid" d="M440 352 H720 V378 H440 Z
+                        M457.5 352 V378 M475 352 V378 M492.5 352 V378 M510 352 V378 M527.5 352 V378
+                        M545 352 V378 M562.5 352 V378 M580 352 V378 M597.5 352 V378 M615 352 V378
+                        M632.5 352 V378 M650 352 V378 M667.5 352 V378 M685 352 V378 M702.5 352 V378"/>
+  <g class="e" marker-end="url(#a)">
+    <path d="M448.75 380 V396"/>
+    <path d="M483.75 380 V396"/>
+    <path d="M518.75 380 V396"/>
+    <path d="M553.75 380 V396"/>
+    <path d="M588.75 380 V396"/>
+    <path d="M623.75 380 V396"/>
+    <path d="M658.75 380 V396"/>
+    <path d="M693.75 380 V396"/>
+  </g>
+  <text class="m" x="448.75" y="409" text-anchor="middle">LD0</text>
+  <text class="m" x="483.75" y="409" text-anchor="middle">LD1</text>
+  <text class="m" x="518.75" y="409" text-anchor="middle">LD2</text>
+  <text class="m" x="553.75" y="409" text-anchor="middle">LD3</text>
+  <text class="m" x="588.75" y="409" text-anchor="middle">LD4</text>
+  <text class="m" x="623.75" y="409" text-anchor="middle">LD5</text>
+  <text class="m" x="658.75" y="409" text-anchor="middle">LD6</text>
+  <text class="m" x="693.75" y="409" text-anchor="middle">LD7</text>
+  <text class="s" x="580" y="434">流水 →：LD k 讀 k/8 週期前的那格（如上）</text>
+  <text class="s" x="580" y="454">流水 ←：順序反過來，LD7 讀最新</text>
+  <text class="s" x="580" y="474">基礎：8 顆都讀最新一格 → 同步呼吸</text>
+  <text class="s" x="580" y="502">讀出後經 Gamma 校正（γ = 2.2）</text>
+  <text class="s" x="580" y="518">讓亮度變化看起來均勻</text>
 
-  <!-- ② 亮度 FSM -->
-  <rect class="box" x="170" y="230" width="270" height="110" rx="6"/>
-  <text class="t" x="305" y="252">② 亮度 FSM（主波形）</text>
-  <text class="s" x="305" y="272">漸亮 → 最亮停留 → 漸暗 → 最暗</text>
-  <text class="s" x="305" y="290">呼吸週期固定約 2 s</text>
-  <text class="s" x="305" y="308">最亮停留佔 0 / 25 / 50 / 75 %</text>
-  <text class="s" x="305" y="326">關閉呼吸時停在最亮（恆亮）</text>
+  <!-- ①⑦⑧ PWM -->
+  <rect class="box" x="780" y="290" width="200" height="250" rx="6"/>
+  <text class="t" x="880" y="314">①⑦⑧ PWM 輸出 ×8</text>
+  <polyline class="wave" points="800,410 853.3,340 853.3,410 906.7,340 906.7,410 960,340"/>
+  <path class="axis" d="M800 380 H960"/>
+  <text class="l" x="958" y="374" text-anchor="end">duty</text>
+  <text class="l" x="802" y="336">計數值</text>
+  <polyline class="wave" points="800,440 822.9,440 822.9,462 853.3,462 853.3,440 876.2,440 876.2,462 906.7,462 906.7,440 929.5,440 929.5,462 960,462"/>
+  <text class="l" x="802" y="478">LED</text>
+  <text class="s" x="880" y="498">計數值 &lt; duty 時亮</text>
+  <text class="s" x="880" y="514">duty 越大 → 亮越久 → 越亮</text>
+  <text class="s" x="880" y="530">約 1 kHz，眼睛看不出閃爍</text>
 
-  <!-- ⑥ 流水延遲線 -->
-  <rect class="box" x="520" y="230" width="380" height="110" rx="6"/>
-  <text class="t" x="710" y="252">⑥ 流水延遲線</text>
-  <text class="s" x="710" y="272">每個 PWM 週期把亮度存進歷史 RAM（Block RAM）</text>
-  <text class="s" x="710" y="290">基礎：8 顆都讀最新一筆 → 同步呼吸</text>
-  <text class="s" x="710" y="308">流水：LD k 讀 k × 1/8 週期前的亮度（反向時 7 − k）</text>
-  <text class="s" x="710" y="326">讀出後經 Gamma 校正（γ = 2.2）</text>
+  <!-- 8 顆 LED（流水 → 時的波形） -->
+  <rect class="box" x="1020" y="290" width="240" height="250" rx="6"/>
+  <text class="t" x="1140" y="314">8 顆 LED（流水 → 時）</text>
+  <path class="axis" d="M1131 330 V532"/>
+  <text class="l" x="1136" y="330">此刻</text>
 
-  <!-- ⑦ duty 影子暫存器 -->
-  <rect class="box" x="470" y="410" width="250" height="70" rx="6"/>
-  <text class="t" x="595" y="436">⑦ duty 影子暫存器 ×8</text>
-  <text class="s" x="595" y="458">只在 PWM 週期交界更新</text>
+  <text class="m" x="1052" y="348" text-anchor="end">LD0</text>
+  <svg x="1056" y="334" width="150" height="20" viewBox="0 0 150 20"><use href="#w" x="-150"/></svg>
+  <circle class="led" cx="1232" cy="344" r="8" fill-opacity="1"/><circle class="ring" cx="1232" cy="344" r="8"/>
 
-  <!-- ⑧ 比較器與輸出 -->
-  <rect class="box" x="800" y="410" width="210" height="70" rx="6"/>
-  <text class="t" x="905" y="436">⑧ 比較器與輸出 ×8</text>
-  <text class="s" x="905" y="458">計數值 &lt; duty 時點亮</text>
-  <text class="s" x="905" y="474">依 LED 極性輸出</text>
+  <text class="m" x="1052" y="373" text-anchor="end">LD1</text>
+  <svg x="1056" y="359" width="150" height="20" viewBox="0 0 150 20"><use href="#w" x="-131.25"/></svg>
+  <circle class="led" cx="1232" cy="369" r="8" fill-opacity="0.75"/><circle class="ring" cx="1232" cy="369" r="8"/>
 
-  <!-- ① PWM 計數器 -->
-  <rect class="box" x="190" y="550" width="220" height="70" rx="6"/>
-  <text class="t" x="300" y="574">① PWM 計數器</text>
-  <text class="s" x="300" y="594">產生約 1 kHz 的 8 bit 鋸齒波</text>
-  <text class="s" x="300" y="610">標出每個 PWM 週期結束點</text>
+  <text class="m" x="1052" y="398" text-anchor="end">LD2</text>
+  <svg x="1056" y="384" width="150" height="20" viewBox="0 0 150 20"><use href="#w" x="-112.5"/></svg>
+  <circle class="led" cx="1232" cy="394" r="8" fill-opacity="0.5"/><circle class="ring" cx="1232" cy="394" r="8"/>
+
+  <text class="m" x="1052" y="423" text-anchor="end">LD3</text>
+  <svg x="1056" y="409" width="150" height="20" viewBox="0 0 150 20"><use href="#w" x="-93.75"/></svg>
+  <circle class="led" cx="1232" cy="419" r="8" fill-opacity="0.25"/><circle class="ring" cx="1232" cy="419" r="8"/>
+
+  <text class="m" x="1052" y="448" text-anchor="end">LD4</text>
+  <svg x="1056" y="434" width="150" height="20" viewBox="0 0 150 20"><use href="#w" x="-75"/></svg>
+  <circle class="led" cx="1232" cy="444" r="8" fill-opacity="0.08"/><circle class="ring" cx="1232" cy="444" r="8"/>
+
+  <text class="m" x="1052" y="473" text-anchor="end">LD5</text>
+  <svg x="1056" y="459" width="150" height="20" viewBox="0 0 150 20"><use href="#w" x="-56.25"/></svg>
+  <circle class="led" cx="1232" cy="469" r="8" fill-opacity="0.25"/><circle class="ring" cx="1232" cy="469" r="8"/>
+
+  <text class="m" x="1052" y="498" text-anchor="end">LD6</text>
+  <svg x="1056" y="484" width="150" height="20" viewBox="0 0 150 20"><use href="#w" x="-37.5"/></svg>
+  <circle class="led" cx="1232" cy="494" r="8" fill-opacity="0.5"/><circle class="ring" cx="1232" cy="494" r="8"/>
+
+  <text class="m" x="1052" y="523" text-anchor="end">LD7</text>
+  <svg x="1056" y="509" width="150" height="20" viewBox="0 0 150 20"><use href="#w" x="-18.75"/></svg>
+  <circle class="led" cx="1232" cy="519" r="8" fill-opacity="0.75"/><circle class="ring" cx="1232" cy="519" r="8"/>
+
+  <!-- ===================== 連線 ===================== -->
+  <g class="e" marker-end="url(#a)">
+    <path d="M240 148 H290"/>
+    <path d="M490 148 H540"/>
+    <path d="M620 236 V262 H200 V290"/>
+    <path d="M720 236 V290"/>
+    <path d="M380 380 H420"/>
+    <path d="M740 380 H780"/>
+    <path d="M980 380 H1020"/>
+  </g>
+  <text class="l" x="410" y="256" text-anchor="middle">停留佔比 · 呼吸開關</text>
+  <text class="l" x="728" y="270">模式</text>
+  <text class="l" x="400" y="372" text-anchor="middle">亮度</text>
+  <text class="l" x="760" y="372" text-anchor="middle">8 個值</text>
+  <text class="l" x="1000" y="372" text-anchor="middle">×8</text>
 
   <!-- 註解 -->
-  <text class="l" x="20" y="654">每個方塊對應 src/HW_2.vhd 中一個編號區段的 process；全部由同一個 clk 驅動，不產生衍生時脈。</text>
-  <text class="l" x="20" y="672">8 顆 LED 共用 ①–⑥ 與同一條主波形，只有讀歷史 RAM 的延遲不同；⑦、⑧ 各有 ×8 份。</text>
+  <text class="l" x="20" y="580">圓圈編號 ①–⑧ 對應 src/HW_2.vhd 的區段（③ 是給按鈕計時的 1 ms 節拍，① 是 PWM 計數器）；全部由同一個 100 MHz clk 驅動。</text>
+  <text class="l" x="20" y="600">8 顆 LED 只有一條主波形，差別只在從延遲線讀哪一格，所以停留佔比與呼吸開關在三種模式下都一樣有效。</text>
 </svg>
