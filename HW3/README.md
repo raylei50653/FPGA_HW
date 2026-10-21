@@ -19,6 +19,13 @@
 - 單一時脈域，像素率 100 MHz / 4 = 25 MHz（以時脈致能推進）
 - 內部有一組 RGB888 視訊串流（`stream_*`），之後加 HDMI 只要換掉輸出級，見 SPEC §6.4
 
+![旋轉多面體動畫](docs/spin.gif)
+
+轉速 ×4，前半段實心打光、後半段全息點雲。動畫由 [`docs/preview.html`](docs/preview.html) 產生：它用
+JavaScript 照同樣的演算法重畫（浮點數，和測試檔的參考模型相同），和下圖模擬擷取的實心打光畫面比對，
+640 × 480 裡只差 42 個像素，都在面的交界。在瀏覽器打開它可以用 BTNU、BTND、BTNL、BTNR、SW0 操作，
+也能重新匯出 GIF。
+
 ![模擬擷取的畫面](docs/sim_frames.png)
 
 左：RGB888 視訊串流（多位元 DAC 或 HDMI）；右：每色 1 bit 的 VGA 輸出。由上而下：實心打光、
