@@ -94,9 +94,6 @@
       <div class="leds" id="leds"></div>
       <span id="stateText" class="muted"></span>
     </div>
-    <div class="row">
-      <label><input type="checkbox" id="vga1"> 每色 1 bit 的 VGA 輸出（取最高位元）</label>
-    </div>
   </div>
 
   <div class="panel">
@@ -243,7 +240,7 @@ function dotHit(u, v, keyHi) {
 }
 
 // ---------------------------------------------------------------------------
-// 一幀畫面：st = { mode, holo, vga1, ax[], ay[] }，輸出 RGBA（Uint32，little endian）
+// 一幀畫面：st = { mode, holo, ax[], ay[] }，輸出 RGBA（Uint32，little endian）
 // ---------------------------------------------------------------------------
 const lab = new Uint8Array(W * H);       // 正面標籤：在形狀內 & 形狀編號 & 面編號
 const blab = new Uint8Array(W * H);      // 背面標籤
@@ -327,10 +324,6 @@ function render(st, out) {
           px = shade[p];
         }
       }
-      if (st.vga1) {
-        const r = (px & 0x80) ? 255 : 0, g = (px & 0x8000) ? 255 : 0, b = (px & 0x800000) ? 255 : 0;
-        px = pack(r, g, b);
-      }
       out[p] = px;
     }
   }
@@ -395,7 +388,7 @@ function tick(now) {
   last = now;
   while (acc >= 1) { stepFrame(board); acc -= 1; }
   if (!busy) {
-    render({ mode: board.mode, holo: board.holo, vga1: $('vga1').checked, ax: board.ax, ay: board.ay }, pix);
+    render({ mode: board.mode, holo: board.holo, ax: board.ax, ay: board.ay }, pix);
     ctx.putImageData(img, 0, 0);
   }
   updatePanel();
@@ -494,13 +487,13 @@ function encodeGif(frames, w, h, delayCs) {
 }
 
 // 從角度 0 開始轉，前半段實心打光、後半段全息點雲；裁出形體所在的那一條
-async function makeGif({ perStyle = 24, speedSel = 2, delayCs = 4, top = 120, height = 240, vga1 = false } = {}) {
+async function makeGif({ perStyle = 24, speedSel = 2, delayCs = 4, top = 120, height = 240 } = {}) {
   const b = { mode: 1, holo: 0, dir: 0, speedSel, running: true, ax: [0, 0, 0], ay: [0, 0, 0], frameCnt: 0 };
   const full = new Uint32Array(W * H);
   const frames = [];
   for (let i = 0; i < 2 * perStyle; i++) {
     b.holo = i < perStyle ? 0 : 1;
-    render({ mode: 1, holo: b.holo, vga1, ax: b.ax, ay: b.ay }, full);
+    render({ mode: 1, holo: b.holo, ax: b.ax, ay: b.ay }, full);
     frames.push(full.slice(top * W, (top + height) * W));
     stepFrame(b);
     if (i % 4 === 3) {
@@ -518,7 +511,7 @@ $('gifBtn').onclick = async () => {
   btn.disabled = true;
   busy = true;
   try {
-    const gif = await makeGif({ vga1: $('vga1').checked });
+    const gif = await makeGif();
     const url = URL.createObjectURL(new Blob([gif], { type: 'image/gif' }));
     const a = document.createElement('a');
     a.href = url;

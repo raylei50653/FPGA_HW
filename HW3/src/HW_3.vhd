@@ -20,7 +20,7 @@ entity HW_3 is
         V_SYNC          : positive := 2;
         V_BP            : positive := 33;
         SYNC_ACTIVE_LOW : boolean  := true;       -- 640×480@60 的 hs / vs 為負極性
-        RED_BITS        : positive := 1;          -- 每色位元數（1 ~ 8）：基本要求 1 bit；Bonus 不限，
+        RED_BITS        : positive := 1;          -- 每色位元數（1 ~ 8）：基本模式要求 1 bit；多面體不限，
         GREEN_BITS      : positive := 1;          --   接多位元電阻 DAC 時加大（內部全程 RGB888）
         BLUE_BITS       : positive := 1;
         -- 基本模式的色塊：左上角 (X, Y)、寬 W、高 H（像素）
