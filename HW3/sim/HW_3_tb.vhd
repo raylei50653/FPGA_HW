@@ -6,9 +6,9 @@ use STD.TEXTIO.ALL;
 
 -- HW3 VGA 掃描自我檢查測試檔（對應 SPEC.md 第 9 節）
 --   以真實的 640×480@60 參數跑數幀：檢查 hs / vs 時序、基本模式的 RGB 色塊、
---   切換到旋轉圖形後每個形狀的面積、旋轉、樣式與暫停
+--   切換到旋轉多面體後，每個像素看到的面與浮點數光線投射的參考模型比對，並檢查樣式、VGA 輸出與暫停
 --   畫面從 RGB888 視訊串流擷取（VHDL-2008 external name），存成 PPM 圖檔，可直接打開看
---   本檔需以 VHDL 2008 編譯；全程約 9 幀（約 150 ms 模擬時間，Vivado 約 1～2 分鐘），結束時印出 PASS / FAIL
+--   本檔需以 VHDL 2008 編譯；全程約 9 幀（約 150 ms 模擬時間），結束時印出 PASS / FAIL
 entity HW_3_tb is
     Generic (
         OUT_DIR : string := ""                  -- PPM 輸出目錄（含結尾斜線），空字串為模擬工作目錄
@@ -27,23 +27,25 @@ architecture Behavioral of HW_3_tb is
     constant V_TOTAL  : positive := 525;
     constant DB       : positive := 16;         -- 去彈跳 clk 數
     constant TP       : time     := PIX_DIV * T; -- 一個像素
+    constant NPIX     : positive := H_ACTIVE * V_ACTIVE;
 
     -- 與設計相同的形狀設定
     constant SHAPES : positive := 3;
     type int_arr_t is array (0 to SHAPES - 1) of integer;
     type rgb_arr_t is array (0 to SHAPES - 1) of std_logic_vector(23 downto 0);
-    constant SIDES_A : int_arr_t := (3, 4, 6);
-    constant RADIUS  : real      := real(H_ACTIVE * 9 / 64);
-    constant FILL_C  : rgb_arr_t := (x"E04050", x"40C060", x"3070F0");
+    constant SOLID_A : int_arr_t := (0, 1, 2);
+    constant FACES_A : int_arr_t := (6, 8, 12);
+    constant SPIN_X_A : int_arr_t := (2, 3, -1);
+    constant SPIN_Y_A : int_arr_t := (3, -2, 2);
+    constant CX_A    : int_arr_t := (H_ACTIVE / 6, H_ACTIVE / 2, 5 * H_ACTIVE / 6);
+    constant CY      : integer   := V_ACTIVE / 2;
+    constant RADIUS  : integer   := H_ACTIVE * 5 / 32;
+    constant EDGE_C  : std_logic_vector(23 downto 0) := x"FFFFFF";
+    constant BG_C    : std_logic_vector(23 downto 0) := x"000000";
     constant BLK_C   : rgb_arr_t := (x"FF0000", x"00FF00", x"0000FF");
     constant BLK_PIX : natural   := 160 * 160;  -- 預設色塊大小，三塊互不重疊
-    constant EDGE_C  : rgb_arr_t := (x"FFD0D0", x"D0FFD0", x"D0E8FF");
+    constant ANG_ONE : real      := 1024.0;     -- 一圈的角度步數（ANGLE_BITS = 10）
 
-    -- 正 N 邊形面積 = N R² sin(2π/N) / 2
-    function poly_area(n : positive) return real is
-    begin
-        return real(n) * RADIUS * RADIUS * sin(MATH_2_PI / real(n)) / 2.0;
-    end function;
 
     -- xsim 2018.3 不支援 VHDL-2008 的 to_string
     function to_str(v : std_logic_vector) return string is
@@ -55,6 +57,198 @@ architecture Behavioral of HW_3_tb is
             k := k + 1;
         end loop;
         return s;
+    end function;
+
+    --------------------------------------------------
+    -- 參考模型：以浮點數重新推一次多面體，與設計的定點管線無關
+    --------------------------------------------------
+    constant PHI : real := (1.0 + sqrt(5.0)) / 2.0;
+    type vec3_t is array (0 to 2) of real;
+
+    function bit_sign(k, b : natural) return real is
+    begin
+        if (k / 2**b) mod 2 = 0 then return 1.0; else return -1.0; end if;
+    end function;
+
+    function cyc(g : natural; p, q : real) return vec3_t is
+        variable tt, v : vec3_t;
+    begin
+        tt := (0.0, p, q);
+        for j in 0 to 2 loop
+            v(j) := tt((j + g) mod 3);
+        end loop;
+        return v;
+    end function;
+
+    function base_normal(sol, k : natural) return vec3_t is
+        variable v : vec3_t := (0.0, 0.0, 0.0);
+    begin
+        case sol is
+            when 0 => v(k / 2) := bit_sign(k, 0);
+            when 1 => v := (bit_sign(k, 0), bit_sign(k, 1), bit_sign(k, 2));
+            when 2 => v := cyc(k / 4, bit_sign(k, 0), bit_sign(k, 1) * PHI);
+            when others =>
+                if k < 8 then
+                    v := (bit_sign(k, 0), bit_sign(k, 1), bit_sign(k, 2));
+                else
+                    v := cyc((k - 8) / 4, bit_sign(k, 0) / PHI, bit_sign(k, 1) * PHI);
+                end if;
+        end case;
+        return v;
+    end function;
+
+    function in_ratio(sol : natural) return real is
+    begin
+        if sol <= 1 then return 1.0 / sqrt(3.0); else return sqrt((5.0 + 2.0 * sqrt(5.0)) / 15.0); end if;
+    end function;
+
+    -- 繞 y 轉 b、再繞 x 轉 a
+    function rot(v : vec3_t; a, b : real) return vec3_t is
+        variable r      : vec3_t;
+        variable y1, z1 : real;
+    begin
+        r(0) := cos(b) * v(0) + sin(b) * v(2);
+        y1   := v(1);
+        z1   := cos(b) * v(2) - sin(b) * v(0);
+        r(1) := cos(a) * y1 - sin(a) * z1;
+        r(2) := sin(a) * y1 + cos(a) * z1;
+        return r;
+    end function;
+
+    type normals_t is array (0 to 19) of vec3_t;
+
+    function unit(v : vec3_t) return vec3_t is
+        variable len : real;
+    begin
+        len := sqrt(v(0) * v(0) + v(1) * v(1) + v(2) * v(2));
+        return (v(0) / len, v(1) / len, v(2) / len);
+    end function;
+
+    function cross(a, b : vec3_t) return vec3_t is
+    begin
+        return (a(1) * b(2) - a(2) * b(1), a(2) * b(0) - a(0) * b(2), a(0) * b(1) - a(1) * b(0));
+    end function;
+
+    -- which = 0 法向量；1、2 為面上的切向量 t1 = n × ref、t2 = n × t1（與設計相同的取法）
+    --   先套初始傾斜 Rx(30°)·Ry(40°)，再套 Rx(α)·Ry(β)
+    function ref_vecs(sol, nf, which : natural; a, b : real) return normals_t is
+        variable n      : normals_t;
+        variable v, r   : vec3_t;
+        variable t1     : vec3_t;
+    begin
+        for k in 0 to nf - 1 loop
+            v := unit(base_normal(sol, k));
+            if which > 0 then
+                if abs v(1) < 0.9 then r := (0.0, 1.0, 0.0); else r := (1.0, 0.0, 0.0); end if;
+                t1 := unit(cross(v, r));
+                if which = 1 then v := t1; else v := cross(v, t1); end if;
+            end if;
+            n(k) := rot(rot(v, MATH_PI / 6.0, MATH_PI * 2.0 / 9.0), a, b);
+        end loop;
+        return n;
+    end function;
+
+    function ref_normals(sol, nf : natural; a, b : real) return normals_t is
+    begin
+        return ref_vecs(sol, nf, 0, a, b);
+    end function;
+
+    -- 光線 (dx, dy, z) 穿過多面體時的進入面 fi、離開面 bi 與兩個深度；不在形狀內時 fi = -1
+    procedure ref_hits(n : normals_t; nf : natural; ap : real; dx, dy : real;
+                       fi, bi : out integer; zf, zb : out real) is
+        variable f, bk   : integer := -1;
+        variable zmin    : real    := 1.0e30;
+        variable zmax    : real    := -1.0e30;
+        variable r, z    : real;
+    begin
+        fi := -1;
+        bi := -1;
+        zf := 0.0;
+        zb := 0.0;
+        for k in 0 to nf - 1 loop
+            r := ap - n(k)(0) * dx - n(k)(1) * dy;
+            if abs n(k)(2) < 1.0 / 256.0 then
+                if r < 0.0 then
+                    return;
+                end if;
+            else
+                z := r / n(k)(2);
+                if n(k)(2) < 0.0 then
+                    if z > zmax then zmax := z; f := k; end if;
+                elsif z < zmin then
+                    zmin := z;
+                    bk   := k;
+                end if;
+            end if;
+        end loop;
+        if f >= 0 and bk >= 0 and zmax <= zmin then
+            fi := f;
+            bi := bk;
+            zf := zmax;
+            zb := zmin;
+        end if;
+    end procedure;
+
+    -- 點雲雜湊（與設計相同的位元運算）
+    function rotl(v : unsigned(23 downto 0); r : natural) return unsigned is
+    begin
+        return v(23 - r downto 0) & v(23 downto 24 - r);
+    end function;
+
+    function mix(key : unsigned(23 downto 0)) return unsigned is
+        variable h1, h2 : unsigned(23 downto 0);
+    begin
+        h1 := key xor rotl(key, 5) xor rotl(key, 11);
+        h2 := h1 + rotl(h1, 9);
+        return h2 xor rotl(h2, 15);
+    end function;
+
+    -- 面座標 (u, v)（像素）是否落在點上：格子 8 像素、位置以 1/4 像素計
+    function ref_hit(u, v : real; key_hi : natural) return boolean is
+        variable uq, vq : integer;
+        variable h      : unsigned(23 downto 0);
+        variable pu, pv : integer;
+    begin
+        uq := integer(floor(u * 4.0));
+        vq := integer(floor(v * 4.0));
+        -- 格子編號用 floor 除法（VHDL 的 / 向 0 取整，負數會差一格），取低 8 位元
+        h  := mix(to_unsigned(key_hi, 8) &
+                  to_unsigned(integer(floor(real(vq) / 32.0)) mod 256, 8) &
+                  to_unsigned(integer(floor(real(uq) / 32.0)) mod 256, 8));
+        pu := 9 + 2 * to_integer(h(10 downto 8));
+        pv := 9 + 2 * to_integer(h(13 downto 11));
+        return to_integer(h(7 downto 0)) < 192 and abs ((uq mod 32) - pu) <= 2 and abs ((vq mod 32) - pv) <= 2;
+    end function;
+
+    -- 光線 (dx, dy, z)：回傳看到的面編號，不在形狀內回傳 -1
+    function ref_face(n : normals_t; nf : natural; ap : real; dx, dy : real) return integer is
+        variable zf   : real    := -1.0e30;
+        variable zb   : real    := 1.0e30;
+        variable fi   : integer := -1;
+        variable r, z : real;
+    begin
+        for k in 0 to nf - 1 loop
+            r := ap - n(k)(0) * dx - n(k)(1) * dy;
+            if abs n(k)(2) < 1.0 / 256.0 then
+                if r < 0.0 then
+                    return -1;
+                end if;
+            else
+                z := r / n(k)(2);
+                if n(k)(2) < 0.0 then
+                    if z > zf then
+                        zf := z;
+                        fi := k;
+                    end if;
+                elsif z < zb then
+                    zb := z;
+                end if;
+            end if;
+        end loop;
+        if fi >= 0 and zf <= zb then
+            return fi;
+        end if;
+        return -1;
     end function;
 
     signal clk       : std_logic := '0';
@@ -72,6 +266,8 @@ architecture Behavioral of HW_3_tb is
     signal led       : std_logic_vector(7 downto 0);
     signal done      : boolean := false;
     signal sync_err  : natural := 0;
+    signal ang_x     : int_arr_t := (others => 0);   -- 角度模型（步數，一圈 1024）
+    signal ang_y     : int_arr_t := (others => 0);
 
 begin
 
@@ -137,22 +333,64 @@ begin
 
 
     --------------------------------------------------
+    -- 角度模型：依 SPEC §6.2 自己累加角度，給參考模型用
+    --   只讀 top 層的設定與 frame_tick；xsim 2018.3 的 external name 進不了 for-generate 的第 1、2 個實例
+    --------------------------------------------------
+    ang_model : process
+        alias frame_tick is << signal .HW_3_tb.dut.frame_tick : std_logic >>;
+        alias running    is << signal .HW_3_tb.dut.running    : std_logic >>;
+        alias dir        is << signal .HW_3_tb.dut.dir        : std_logic >>;
+        alias speed_sel  is << signal .HW_3_tb.dut.speed_sel  : unsigned(1 downto 0) >>;
+        variable step : integer;
+    begin
+        wait until rising_edge(clk);
+        if reset = '1' then
+            ang_x <= (others => 0);
+            ang_y <= (others => 0);
+        elsif frame_tick = '1' and running = '1' then
+            for k in 0 to SHAPES - 1 loop
+                step := 2**to_integer(speed_sel);
+                if dir = '1' then
+                    step := -step;
+                end if;
+                ang_x(k) <= (ang_x(k) + SPIN_X_A(k) * step) mod 1024;
+                ang_y(k) <= (ang_y(k) + SPIN_Y_A(k) * step) mod 1024;
+            end loop;
+        end if;
+    end process;
+
+
+    --------------------------------------------------
     -- 主流程
     --------------------------------------------------
     stim : process
-        alias stream_rgb is << signal .HW_3_tb.dut.stream_rgb : std_logic_vector(23 downto 0) >>;
-        alias stream_de  is << signal .HW_3_tb.dut.stream_de  : std_logic >>;
-        alias stream_vs  is << signal .HW_3_tb.dut.stream_vs  : std_logic >>;
-        alias pix_ce     is << signal .HW_3_tb.dut.pix_ce     : std_logic >>;
+        alias stream_rgb   is << signal .HW_3_tb.dut.stream_rgb   : std_logic_vector(23 downto 0) >>;
+        alias stream_label is << signal .HW_3_tb.dut.stream_label : std_logic_vector(7 downto 0) >>;
+        alias stream_de    is << signal .HW_3_tb.dut.stream_de    : std_logic >>;
+        alias stream_vs    is << signal .HW_3_tb.dut.stream_vs    : std_logic >>;
+        alias pix_ce       is << signal .HW_3_tb.dut.pix_ce       : std_logic >>;
 
-        type cnt_arr_t is array (0 to SHAPES - 1) of natural;
+        type cnt_arr_t  is array (0 to SHAPES - 1) of natural;
+        type real_arr_t is array (0 to SHAPES - 1) of real;
+        type label_buf_t is array (0 to NPIX - 1) of natural range 0 to 255;
 
-        variable errors : natural := 0;
-        variable fill   : cnt_arr_t;
-        variable edge   : cnt_arr_t;
-        variable blk    : cnt_arr_t;
-        variable hash   : natural;
-        variable hash0  : natural;
+        variable errors  : natural := 0;
+        variable labels  : label_buf_t;
+        variable pcls    : label_buf_t;        -- 0 背景、1 純色（點雲的點或背面虛線）、2 稜線白、3 其他
+        variable ref_f   : label_buf_t;        -- 參考模型的正面 / 背面標籤與點
+        variable ref_b   : label_buf_t;
+        variable ref_d   : label_buf_t;
+        variable n_shade : natural;            -- 全息樣式下不該出現的顏色（打光的中間色）
+        variable area    : cnt_arr_t;          -- 每個形狀標籤為「在形狀內」的像素數
+        variable nfaces  : cnt_arr_t;          -- 看得到幾個面
+        variable blk     : cnt_arr_t;
+        variable n_edge  : natural;            -- 稜線色像素
+        variable n_extra : natural;            -- 既不是稜線也不是背景，且不在任何形狀內
+        variable n_wire  : natural;            -- 不是稜線也不是背景色
+        variable n_vga   : natural;            -- VGA 輸出與串流的高位元不符
+        variable hash    : natural;
+        variable hash0   : natural;
+        variable ax, ay  : real_arr_t;         -- 擷取的那一幀用的角度（弧度）
 
         procedure press(signal b : out std_logic) is
         begin
@@ -162,74 +400,262 @@ begin
             wait for 4 * DB * T;
         end procedure;
 
-        -- 擷取下一個完整畫面：統計各形狀填色 / 外框像素數、算雜湊，需要時存成 PPM
+        -- 擷取下一個完整畫面：記下每個像素的標籤、統計顏色、檢查 VGA 輸出，需要時存成 PPM
+        --   rgb 是 RGB888 視訊串流，vga 是實際的 1 bit 腳位輸出（放大成 0 / 255）
         procedure capture(name : string; save : boolean) is
-            file     f    : text;
-            variable l    : line;
-            variable pix  : std_logic_vector(23 downto 0);
-            variable n    : natural := 0;
+            file     f, fv     : text;
+            variable l, lv     : line;
+            variable pix       : std_logic_vector(23 downto 0);
+            variable lab       : natural;
+            variable n         : natural := 0;
+            variable want      : std_logic_vector(2 downto 0);   -- 上一個 ce 讀到的像素的各色高位元
+            variable got       : std_logic_vector(2 downto 0);
+            variable pend      : boolean := false;
+            variable nv        : natural := 0;                   -- 已檢查的 VGA 像素數
+            type seen_t is array (0 to SHAPES - 1, 0 to 31) of boolean;
+            variable seen      : seen_t := (others => (others => false));
         begin
-            fill := (others => 0);
-            edge := (others => 0);
-            blk  := (others => 0);
-            hash := 0;
+            area    := (others => 0);
+            nfaces  := (others => 0);
+            blk     := (others => 0);
+            n_edge  := 0;
+            n_extra := 0;
+            n_wire  := 0;
+            n_shade := 0;
+            n_vga   := 0;
+            hash    := 0;
             if save then
-                file_open(f, OUT_DIR & name, write_mode);
+                file_open(f, OUT_DIR & name & ".ppm", write_mode);
+                file_open(fv, OUT_DIR & name & "_vga.ppm", write_mode);
                 write(l, string'("P3"));
                 writeline(f, l);
                 write(l, integer'image(H_ACTIVE) & " " & integer'image(V_ACTIVE));
                 writeline(f, l);
                 write(l, string'("255"));
                 writeline(f, l);
+                write(lv, string'("P3"));
+                writeline(fv, lv);
+                write(lv, integer'image(H_ACTIVE) & " " & integer'image(V_ACTIVE));
+                writeline(fv, lv);
+                write(lv, string'("255"));
+                writeline(fv, lv);
             end if;
 
-            -- 從垂直遮沒結束後開始，確保拿到一整幀
+            -- 從垂直遮沒結束後開始，確保拿到一整幀；這時角度已是這一幀要用的值
             wait until rising_edge(clk) and stream_vs = '1';
             wait until rising_edge(clk) and stream_vs = '0';
+            for k in 0 to SHAPES - 1 loop
+                ax(k) := MATH_2_PI * real(ang_x(k)) / ANG_ONE;
+                ay(k) := MATH_2_PI * real(ang_y(k)) / ANG_ONE;
+            end loop;
 
-            while n < H_ACTIVE * V_ACTIVE loop
+            -- VGA 腳位比串流晚一個 ce：每個 ce 先檢查上一個像素的 VGA 輸出，再讀這個像素
+            while n < NPIX or pend loop
                 wait until rising_edge(clk);
-                if pix_ce = '1' and stream_de = '1' then
-                    pix := stream_rgb;
-                    for k in 0 to SHAPES - 1 loop
-                        if pix = FILL_C(k) then
-                            fill(k) := fill(k) + 1;
-                        elsif pix = EDGE_C(k) then
-                            edge(k) := edge(k) + 1;
-                        elsif pix = BLK_C(k) then
-                            blk(k) := blk(k) + 1;
+                if pix_ce = '1' then
+                    if pend then
+                        got := vga_r(0) & vga_g(0) & vga_b(0);
+                        if got /= want then
+                            n_vga := n_vga + 1;
                         end if;
-                    end loop;
-                    hash := (hash * 7 + to_integer(unsigned(pix(23 downto 12))) + to_integer(unsigned(pix(11 downto 0)))) mod 16777213;
-                    if save then
-                        write(l, integer'image(to_integer(unsigned(pix(23 downto 16)))) & " " &
-                                 integer'image(to_integer(unsigned(pix(15 downto 8)))) & " " &
-                                 integer'image(to_integer(unsigned(pix(7 downto 0)))) & " ");
-                        if (n + 1) mod H_ACTIVE = 0 then
-                            writeline(f, l);
+                        nv := nv + 1;
+                        if save then
+                            for c in 2 downto 0 loop
+                                if got(c) = '1' then write(lv, string'("255 ")); else write(lv, string'("0 ")); end if;
+                            end loop;
+                            if nv mod H_ACTIVE = 0 then
+                                writeline(fv, lv);
+                            end if;
                         end if;
                     end if;
-                    n := n + 1;
+                    pend := false;
+
+                    if stream_de = '1' and n < NPIX then
+                        pix := stream_rgb;
+                        lab := to_integer(unsigned(stream_label));
+                        labels(n) := lab;
+
+                        if lab >= 128 then
+                            area((lab / 32) mod 4) := area((lab / 32) mod 4) + 1;
+                            seen((lab / 32) mod 4, lab mod 32) := true;
+                        end if;
+                        for k in 0 to SHAPES - 1 loop
+                            if pix = BLK_C(k) then
+                                blk(k) := blk(k) + 1;
+                            end if;
+                        end loop;
+                        if pix = EDGE_C then
+                            n_edge := n_edge + 1;
+                            pcls(n) := 2;
+                        elsif pix /= BG_C then
+                            n_wire := n_wire + 1;
+                            if lab < 128 then
+                                n_extra := n_extra + 1;
+                            end if;
+                            if pix = BLK_C(0) or pix = BLK_C(1) or pix = BLK_C(2) then
+                                pcls(n) := 1;
+                            else
+                                pcls(n) := 3;
+                                n_shade := n_shade + 1;
+                            end if;
+                        else
+                            pcls(n) := 0;
+                        end if;
+
+                        want := pix(23) & pix(15) & pix(7);
+                        pend := true;
+
+                        hash := (hash * 7 + to_integer(unsigned(pix(23 downto 12))) +
+                                 to_integer(unsigned(pix(11 downto 0))) + lab) mod 16777213;
+                        if save then
+                            write(l, integer'image(to_integer(unsigned(pix(23 downto 16)))) & " " &
+                                     integer'image(to_integer(unsigned(pix(15 downto 8)))) & " " &
+                                     integer'image(to_integer(unsigned(pix(7 downto 0)))) & " ");
+                            if (n + 1) mod H_ACTIVE = 0 then
+                                writeline(f, l);
+                            end if;
+                        end if;
+                        n := n + 1;
+                    end if;
                 end if;
+            end loop;
+
+            for k in 0 to SHAPES - 1 loop
+                for i in 0 to 31 loop
+                    if seen(k, i) then
+                        nfaces(k) := nfaces(k) + 1;
+                    end if;
+                end loop;
             end loop;
 
             if save then
                 file_close(f);
-                report "wrote " & OUT_DIR & name;
+                file_close(fv);
+                report "wrote " & OUT_DIR & name & ".ppm / " & name & "_vga.ppm";
+            end if;
+            if n_vga /= 0 then
+                report name & ": " & integer'image(n_vga) & " VGA pixels differ from the stream's top bits" severity error;
+                errors := errors + 1;
             end if;
         end procedure;
 
-        -- 形狀面積（填色 + 外框）與理論值差 3% 以內
-        procedure check_area(tag : string) is
-            variable got, want : real;
+        -- 每個形狀外接方框內的像素，逐一與參考模型比對看到的面
+        --   允許少量不符：只會出現在面與面的交界（定點誤差讓邊界差一個像素）
+        procedure check_ref(tag : string) is
+            variable n       : normals_t;
+            variable ap      : real;
+            variable fr, lab : integer;
+            variable want    : integer;
+            variable ref_a   : natural;
+            variable miss    : natural;
         begin
             for k in 0 to SHAPES - 1 loop
-                got  := real(fill(k) + edge(k));
-                want := poly_area(SIDES_A(k));
-                report tag & ": shape " & integer'image(k) & " fill " & integer'image(fill(k)) &
-                       " edge " & integer'image(edge(k)) & " area " & integer'image(integer(want));
-                if abs (got - want) > 0.03 * want then
-                    report tag & ": shape " & integer'image(k) & " area off" severity error;
+                n     := ref_normals(SOLID_A(k), FACES_A(k), ax(k), ay(k));
+                ap    := real(RADIUS) * in_ratio(SOLID_A(k));
+                ref_a := 0;
+                miss  := 0;
+                for yy in CY - RADIUS - 2 to CY + RADIUS + 2 loop
+                    for xx in CX_A(k) - RADIUS - 2 to CX_A(k) + RADIUS + 2 loop
+                        fr  := ref_face(n, FACES_A(k), ap, real(xx - CX_A(k)), real(yy - CY));
+                        lab := labels(yy * H_ACTIVE + xx);
+                        if fr >= 0 then
+                            ref_a := ref_a + 1;
+                            want  := 128 + k * 32 + fr;
+                        else
+                            want  := 0;
+                        end if;
+                        if lab /= want then
+                            miss := miss + 1;
+                        end if;
+                    end loop;
+                end loop;
+                report tag & ": shape " & integer'image(k) & " area " & integer'image(area(k)) &
+                       " ref " & integer'image(ref_a) & " faces " & integer'image(nfaces(k)) &
+                       " mismatched " & integer'image(miss);
+                if miss > ref_a / 200 + 10 then
+                    report tag & ": shape " & integer'image(k) & " differs from the reference model" severity error;
+                    errors := errors + 1;
+                end if;
+                if nfaces(k) < 2 then
+                    report tag & ": shape " & integer'image(k) & " shows fewer than 2 faces" severity error;
+                    errors := errors + 1;
+                end if;
+            end loop;
+        end procedure;
+
+        -- 全息點雲：參考模型逐像素算出進入面、離開面與兩個面座標，用同一個雜湊決定點，
+        --   再加上背面標籤變化的虛線；正面稜線（白色）的位置不比對
+        --   允許少量不符：只會出現在點的邊緣（定點與浮點的面座標差一點點，就會差一個像素）
+        procedure check_holo(tag : string) is
+            variable nn, t1, t2 : normals_t;
+            variable ap         : real;
+            variable fi, bi     : integer;
+            variable zf, zb     : real;
+            variable px, q      : integer;
+            variable rf, rb     : boolean;
+            variable want, got  : boolean;
+            variable n_want     : natural;
+            variable n_got      : natural;
+            variable miss       : natural;
+            function lab(arr : label_buf_t; x, y : integer) return natural is
+            begin
+                return arr(y * H_ACTIVE + x);
+            end function;
+        begin
+            for k in 0 to SHAPES - 1 loop
+                nn := ref_vecs(SOLID_A(k), FACES_A(k), 0, ax(k), ay(k));
+                t1 := ref_vecs(SOLID_A(k), FACES_A(k), 1, ax(k), ay(k));
+                t2 := ref_vecs(SOLID_A(k), FACES_A(k), 2, ax(k), ay(k));
+                ap := real(RADIUS) * in_ratio(SOLID_A(k));
+                for yy in CY - RADIUS - 4 to CY + RADIUS + 4 loop
+                    for xx in CX_A(k) - RADIUS - 4 to CX_A(k) + RADIUS + 4 loop
+                        px := yy * H_ACTIVE + xx;
+                        ref_hits(nn, FACES_A(k), ap, real(xx - CX_A(k)), real(yy - CY), fi, bi, zf, zb);
+                        if fi < 0 then
+                            ref_f(px) := 0;
+                            ref_b(px) := 0;
+                            ref_d(px) := 0;
+                        else
+                            ref_f(px) := 128 + k * 32 + fi;
+                            ref_b(px) := 128 + k * 32 + bi;
+                            rf := ref_hit(t1(fi)(0) * real(xx - CX_A(k)) + t1(fi)(1) * real(yy - CY) + t1(fi)(2) * zf,
+                                          t2(fi)(0) * real(xx - CX_A(k)) + t2(fi)(1) * real(yy - CY) + t2(fi)(2) * zf,
+                                          k * 32 + fi);
+                            rb := ref_hit(t1(bi)(0) * real(xx - CX_A(k)) + t1(bi)(1) * real(yy - CY) + t1(bi)(2) * zb,
+                                          t2(bi)(0) * real(xx - CX_A(k)) + t2(bi)(1) * real(yy - CY) + t2(bi)(2) * zb,
+                                          128 + k * 32 + bi);
+                            if rf or rb then ref_d(px) := 1; else ref_d(px) := 0; end if;
+                        end if;
+                    end loop;
+                end loop;
+
+                n_want := 0;
+                n_got  := 0;
+                miss   := 0;
+                for yy in CY - RADIUS - 2 to CY + RADIUS + 2 loop
+                    for xx in CX_A(k) - RADIUS - 2 to CX_A(k) + RADIUS + 2 loop
+                        px := yy * H_ACTIVE + xx;
+                        q  := ref_f(px);
+                        -- 正面稜線：白色，不比對
+                        if q /= lab(ref_f, xx - 1, yy) or q /= lab(ref_f, xx - 2, yy) or
+                           q /= lab(ref_f, xx, yy - 1) or q /= lab(ref_f, xx, yy - 2) then
+                            next;
+                        end if;
+                        q    := ref_b(px);
+                        want := ref_d(px) = 1 or
+                                (q >= 128 and (xx + yy) mod 4 < 2 and
+                                 (q /= lab(ref_b, xx - 1, yy) or q /= lab(ref_b, xx - 2, yy) or
+                                  q /= lab(ref_b, xx, yy - 1) or q /= lab(ref_b, xx, yy - 2)));
+                        got  := pcls(px) = 1;
+                        if want then n_want := n_want + 1; end if;
+                        if got then n_got := n_got + 1; end if;
+                        if want /= got then miss := miss + 1; end if;
+                    end loop;
+                end loop;
+                report tag & ": shape " & integer'image(k) & " dots ref " & integer'image(n_want) &
+                       " got " & integer'image(n_got) & " mismatched " & integer'image(miss);
+                if n_want = 0 or miss > n_want / 10 + 20 then
+                    report tag & ": shape " & integer'image(k) & " point cloud differs from the reference model" severity error;
                     errors := errors + 1;
                 end if;
             end loop;
@@ -239,11 +665,11 @@ begin
         wait for 10 * T;
         reset <= '0';
 
-        -- 1. reset 後為基本模式：R、G、B 色塊各 160×160，沒有旋轉圖形
-        capture("frame_basic.ppm", true);
+        -- 1. reset 後為基本模式：R、G、B 色塊各 160×160，沒有多面體
+        capture("frame_basic", true);
         for k in 0 to SHAPES - 1 loop
             report "basic: block " & integer'image(k) & " pixels " & integer'image(blk(k));
-            if blk(k) /= BLK_PIX or fill(k) /= 0 or edge(k) /= 0 then
+            if blk(k) /= BLK_PIX or area(k) /= 0 then
                 report "basic: block " & integer'image(k) & " wrong pixels" severity error;
                 errors := errors + 1;
             end if;
@@ -253,25 +679,24 @@ begin
             errors := errors + 1;
         end if;
 
-        -- 2. 按 BTNU 切到旋轉圖形：填色 + 外框，面積正確且有外框
+        -- 2. 按 BTNU 切到旋轉多面體：每個像素看到的面與參考模型一致，有稜線
         press(btn_mode);
         if led(0) /= '1' then
-            report "LD0 off after switching to shapes" severity error;
+            report "LD0 off after switching to solids" severity error;
             errors := errors + 1;
         end if;
-        capture("frame0.ppm", true);
-        check_area("frame0");
+        capture("frame0", true);
+        check_ref("frame0");
         hash0 := hash;
-        for k in 0 to SHAPES - 1 loop
-            if edge(k) = 0 or fill(k) = 0 then
-                report "frame0: shape " & integer'image(k) & " missing fill or edge" severity error;
-                errors := errors + 1;
-            end if;
-        end loop;
+        if n_edge = 0 or n_extra /= 0 then
+            report "frame0: " & integer'image(n_edge) & " ridge pixels, " & integer'image(n_extra) &
+                   " stray pixels" severity error;
+            errors := errors + 1;
+        end if;
 
-        -- 3. 下一幀已轉動：畫面不同、面積不變
-        capture("frame1.ppm", true);
-        check_area("frame1");
+        -- 3. 下一幀已轉動：畫面不同，仍與參考模型一致
+        capture("frame1", false);
+        check_ref("frame1");
         if hash = hash0 then
             report "frame1 identical to frame0: not rotating" severity error;
             errors := errors + 1;
@@ -285,29 +710,37 @@ begin
             report "LED settings after speed / dir: " & to_str(led) severity error;
             errors := errors + 1;
         end if;
-        capture("frame_fast.ppm", true);
-        check_area("fast");
+        capture("frame_fast", true);
+        check_ref("fast");
 
-        -- 5. 只填色：沒有外框色
+        -- 5. BTND 切到全息點雲：LD5 亮；只有背景、白色稜線與純色的點，點的位置與參考模型一致
         press(btn_style);
-        capture("frame_fill.ppm", false);
-        check_area("fill-only");
-        for k in 0 to SHAPES - 1 loop
-            if edge(k) /= 0 then
-                report "fill-only: shape " & integer'image(k) & " still has edge pixels" severity error;
-                errors := errors + 1;
-            end if;
-        end loop;
+        if led(5) /= '1' then
+            report "LD5 off after switching to the point cloud" severity error;
+            errors := errors + 1;
+        end if;
+        capture("frame_holo", true);
+        check_ref("holo");
+        check_holo("holo");
+        if n_shade /= 0 or n_edge = 0 then
+            report "holo: " & integer'image(n_shade) & " shaded pixels, " & integer'image(n_edge) &
+                   " ridge pixels" severity error;
+            errors := errors + 1;
+        end if;
 
-        -- 6. 只有外框：沒有填色
+        -- 6. 再按一次回到實心打光：LD5 熄滅、有稜線
         press(btn_style);
-        capture("frame_wire.ppm", true);
-        for k in 0 to SHAPES - 1 loop
-            if fill(k) /= 0 or edge(k) = 0 then
-                report "wireframe: shape " & integer'image(k) & " wrong pixels" severity error;
-                errors := errors + 1;
-            end if;
-        end loop;
+        if led(5) /= '0' then
+            report "LD5 still on after switching back to solid" severity error;
+            errors := errors + 1;
+        end if;
+        capture("frame_solid", false);
+        check_ref("solid");
+        if n_edge = 0 or n_extra /= 0 then
+            report "solid: " & integer'image(n_edge) & " ridge pixels, " & integer'image(n_extra) &
+                   " stray pixels" severity error;
+            errors := errors + 1;
+        end if;
 
         -- 7. SW0 撥上暫停：連續兩幀相同
         sw_pause <= '1';
@@ -316,9 +749,9 @@ begin
             report "LD1 still on after pause" severity error;
             errors := errors + 1;
         end if;
-        capture("frame_pause_a.ppm", false);
+        capture("frame_pause_a", false);
         hash0 := hash;
-        capture("frame_pause_b.ppm", false);
+        capture("frame_pause_b", false);
         if hash /= hash0 then
             report "paused frames differ" severity error;
             errors := errors + 1;

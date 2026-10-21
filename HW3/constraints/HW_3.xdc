@@ -9,7 +9,7 @@ create_clock -period 10.000 -name sys_clk -waveform {0.000 5.000} [get_ports clk
 
 ## 按鈕：按下為高電位（BTN_ACTIVE_LOW = false）
 set_property -dict { PACKAGE_PIN P16 IOSTANDARD LVCMOS25 } [get_ports reset]      ;# BTNC
-set_property -dict { PACKAGE_PIN T18 IOSTANDARD LVCMOS25 } [get_ports btn_mode]   ;# BTNU 基本色塊 / 旋轉圖形
+set_property -dict { PACKAGE_PIN T18 IOSTANDARD LVCMOS25 } [get_ports btn_mode]   ;# BTNU 基本色塊 / 旋轉多面體
 set_property -dict { PACKAGE_PIN N15 IOSTANDARD LVCMOS25 } [get_ports btn_speed]  ;# BTNL
 set_property -dict { PACKAGE_PIN R18 IOSTANDARD LVCMOS25 } [get_ports btn_dir]    ;# BTNR
 set_property -dict { PACKAGE_PIN R16 IOSTANDARD LVCMOS25 } [get_ports btn_style]  ;# BTND（board file 第 5 顆按鈕）
@@ -18,7 +18,7 @@ set_property -dict { PACKAGE_PIN R16 IOSTANDARD LVCMOS25 } [get_ports btn_style]
 set_property -dict { PACKAGE_PIN F22 IOSTANDARD LVCMOS25 } [get_ports sw_pause]   ;# SW0 暫停旋轉
 
 ## LED：高電位點亮（LED_ACTIVE_LOW = false）
-set_property -dict { PACKAGE_PIN T22 IOSTANDARD LVCMOS33 } [get_ports {led[0]}]   ;# LD0 旋轉圖形模式
+set_property -dict { PACKAGE_PIN T22 IOSTANDARD LVCMOS33 } [get_ports {led[0]}]   ;# LD0 旋轉多面體模式
 set_property -dict { PACKAGE_PIN T21 IOSTANDARD LVCMOS33 } [get_ports {led[1]}]   ;# LD1 轉動中
 set_property -dict { PACKAGE_PIN U22 IOSTANDARD LVCMOS33 } [get_ports {led[2]}]   ;# LD2 反轉
 set_property -dict { PACKAGE_PIN U21 IOSTANDARD LVCMOS33 } [get_ports {led[3]}]   ;# LD3 轉速 bit 0

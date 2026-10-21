@@ -2,10 +2,11 @@ library IEEE;
 use IEEE.STD_LOGIC_1164.ALL;
 use IEEE.NUMERIC_STD.ALL;
 
--- HW3 VGA 掃描：RGB 色塊 + 旋轉幾何圖形（規格見 HW3/SPEC.md）
+-- HW3 VGA 掃描：RGB 色塊 + 旋轉 3D 多面體（規格見 HW3/SPEC.md）
 --   基本模式（reset 後）：R、G、B 三個矩形色塊，位置與大小由 generic 設定，重疊處加色混合
---   進階模式（按 BTNU 切換）：三角形、正方形、六邊形各自旋轉，由 HW_3_poly 的矩陣管線判斷像素
---   內部資料流：時序 -> 多邊形管線 -> 合成 RGB888 視訊串流 -> VGA 輸出級
+--   進階模式（按 BTNU 切換）：立方體、八面體、十二面體各自翻滾，由 HW_3_solid 逐像素算出看到的面
+--     BTND 切換兩種樣式：實心打光 + 白色稜線，或全息點雲（正面與背面的稀疏點、背面稜線畫虛線，可透視）
+--   內部資料流：時序 -> 多面體管線 -> 合成 RGB888 視訊串流 -> VGA 輸出級（取各色高位元）
 --   視訊串流（stream_*）與 VGA 腳位無關，日後 HDMI 編碼器接在這裡
 entity HW_3 is
     Generic (
@@ -19,8 +20,8 @@ entity HW_3 is
         V_SYNC          : positive := 2;
         V_BP            : positive := 33;
         SYNC_ACTIVE_LOW : boolean  := true;       -- 640×480@60 的 hs / vs 為負極性
-        RED_BITS        : positive := 1;          -- 每色位元數（1 ~ 8）；作業規定 R、G、B 各 1 bit
-        GREEN_BITS      : positive := 1;
+        RED_BITS        : positive := 1;          -- 每色位元數（1 ~ 8）：基本要求 1 bit；Bonus 不限，
+        GREEN_BITS      : positive := 1;          --   接多位元電阻 DAC 時加大（內部全程 RGB888）
         BLUE_BITS       : positive := 1;
         -- 基本模式的色塊：左上角 (X, Y)、寬 W、高 H（像素）
         R_X : natural := 60;   R_Y : natural := 160;  R_W : natural := 160;  R_H : natural := 160;
@@ -34,11 +35,11 @@ entity HW_3 is
     Port (
         clk       : in  STD_LOGIC;
         reset     : in  STD_LOGIC;
-        btn_mode  : in  STD_LOGIC;                -- 基本色塊 <-> 旋轉圖形
+        btn_mode  : in  STD_LOGIC;                -- 基本色塊 <-> 旋轉多面體
         sw_pause  : in  STD_LOGIC;                -- 撥上暫停旋轉
         btn_speed : in  STD_LOGIC;                -- 轉速 ×1 -> ×2 -> ×4 -> ×8
         btn_dir   : in  STD_LOGIC;                -- 反轉
-        btn_style : in  STD_LOGIC;                -- 填色 + 外框 -> 只填色 -> 只有外框
+        btn_style : in  STD_LOGIC;                -- 實心打光 + 稜線 <-> 全息點雲
         vga_r     : out STD_LOGIC_VECTOR(RED_BITS - 1 downto 0);
         vga_g     : out STD_LOGIC_VECTOR(GREEN_BITS - 1 downto 0);
         vga_b     : out STD_LOGIC_VECTOR(BLUE_BITS - 1 downto 0);
@@ -51,27 +52,27 @@ end HW_3;
 architecture Behavioral of HW_3 is
 
     --------------------------------------------------
-    -- 形狀設定：0 = 三角形、1 = 正方形、2 = 六邊形，編號小的在上層
+    -- 形狀設定：0 = 立方體、1 = 八面體、2 = 十二面體，編號小的在上層
     --   位置與大小跟著解析度縮放，換成 HDMI 的 1280×720 也排得下
     --------------------------------------------------
-    constant SHAPES   : positive := 3;
-    constant POLY_LAT : positive := 4;            -- HW_3_poly 的管線深度（ce 數）
+    constant SHAPES    : positive := 3;
+    constant TREE_LV   : positive := 5;           -- 比較樹層數，最多 32 個面（二十面體也放得下）
+    constant SOLID_LAT : positive := 9 + TREE_LV; -- HW_3_solid 的管線深度（ce 數）
 
     type int_arr_t is array (0 to SHAPES - 1) of integer;
     type rgb_arr_t is array (0 to SHAPES - 1) of std_logic_vector(23 downto 0);
 
-    constant SIDES_A : int_arr_t := (3, 4, 6);
-    constant SPIN_A  : int_arr_t := (3, -2, 1);   -- 每幀轉 SPIN × 2^speed 步，正數順時針
-    constant CX_A    : int_arr_t := (H_ACTIVE / 4, H_ACTIVE / 2, 3 * H_ACTIVE / 4);
-    constant CY      : natural   := V_ACTIVE / 2;
-    constant RADIUS  : positive  := H_ACTIVE * 9 / 64;   -- 640 寬時 90 像素
-    constant EDGE_W  : positive  := 4;
+    constant SOLID_A  : int_arr_t := (0, 1, 2);
+    constant SPIN_X_A : int_arr_t := (2, 3, -1);  -- 每幀繞 x 軸轉 SPIN × 2^speed 步
+    constant SPIN_Y_A : int_arr_t := (3, -2, 2);  -- 每幀繞 y 軸轉 SPIN × 2^speed 步
+    constant CX_A     : int_arr_t := (H_ACTIVE / 6, H_ACTIVE / 2, 5 * H_ACTIVE / 6);
+    constant CY       : natural   := V_ACTIVE / 2;
+    constant RADIUS   : positive  := H_ACTIVE * 5 / 32;   -- 640 寬時外接球半徑 100 像素
 
-    -- 每色最高位元恰好是純紅、純綠、純藍與白色，1 bit 輸出時顏色不會跑掉
-    constant FILL_C : rgb_arr_t := (x"E04050", x"40C060", x"3070F0");
-    constant EDGE_C : rgb_arr_t := (x"FFD0D0", x"D0FFD0", x"D0E8FF");
-    constant BG_C   : std_logic_vector(23 downto 0) := x"080A14";
-    constant GRID_C : std_logic_vector(23 downto 0) := x"202838";
+    -- 正對光源時的顏色；純紅、純綠、純藍，取高位元時不會混出雜色
+    constant BASE_C : rgb_arr_t := (x"FF0000", x"00FF00", x"0000FF");
+    constant EDGE_C : std_logic_vector(23 downto 0) := x"FFFFFF";
+    constant BG_C   : std_logic_vector(23 downto 0) := x"000000";
 
     -- 像素致能
     signal div_cnt : integer range 0 to PIX_DIV - 1 := 0;
@@ -89,33 +90,73 @@ architecture Behavioral of HW_3 is
     signal p_mode, p_speed, p_dir, p_style : std_logic;
     signal pause_s1  : std_logic := '0';
     signal pause_s2  : std_logic := '0';
-    signal mode      : std_logic := '0';          -- 0 基本色塊、1 旋轉圖形
+    signal mode      : std_logic := '0';          -- 0 基本色塊、1 旋轉多面體
     signal running   : std_logic;
     signal dir       : std_logic := '0';
     signal speed_sel : unsigned(1 downto 0) := "01";
-    signal style     : unsigned(1 downto 0) := "00";
+    signal holo      : std_logic := '0';          -- 0 實心打光 + 稜線、1 全息點雲
     signal frame_cnt : unsigned(5 downto 0) := (others => '0');
 
-    -- 角度
+    -- 角度：每個形狀繞 x、y 軸各一個
     type ang_arr_t is array (0 to SHAPES - 1) of unsigned(ANGLE_BITS - 1 downto 0);
-    signal ang : ang_arr_t := (others => (others => '0'));
+    signal ang_x : ang_arr_t := (others => (others => '0'));
+    signal ang_y : ang_arr_t := (others => (others => '0'));
 
-    -- 多邊形管線輸出
+    -- 多面體管線輸出
+    type face_arr_t is array (0 to SHAPES - 1) of unsigned(4 downto 0);
     signal inside : std_logic_vector(SHAPES - 1 downto 0);
-    signal edge   : std_logic_vector(SHAPES - 1 downto 0);
+    signal face   : face_arr_t;                   -- 看到的面（進入點）
+    signal bface  : face_arr_t;                   -- 光線離開的背面
+    signal shade  : rgb_arr_t;
+    signal dot_f  : std_logic_vector(SHAPES - 1 downto 0);   -- 進入點 / 離開點落在點雲的點上
+    signal dot_b  : std_logic_vector(SHAPES - 1 downto 0);
 
-    -- 與多邊形管線對齊的延遲線
-    type u12_pipe_t is array (1 to POLY_LAT) of unsigned(11 downto 0);
+    -- 與多面體管線對齊的延遲線
+    type u12_pipe_t is array (1 to SOLID_LAT) of unsigned(11 downto 0);
     signal x_d, y_d : u12_pipe_t := (others => (others => '0'));
-    signal de_d     : std_logic_vector(1 to POLY_LAT) := (others => '0');
-    signal hs_d     : std_logic_vector(1 to POLY_LAT) := (others => '0');
-    signal vs_d     : std_logic_vector(1 to POLY_LAT) := (others => '0');
+    signal de_d     : std_logic_vector(1 to SOLID_LAT) := (others => '0');
+    signal hs_d     : std_logic_vector(1 to SOLID_LAT) := (others => '0');
+    signal vs_d     : std_logic_vector(1 to SOLID_LAT) := (others => '0');
+
+    -- 合成：標籤 = 在形狀內 & 形狀編號（2 bit）& 面編號（5 bit），背景為 0
+    --   正面標籤（看到的面）與背面標籤（光線離開的面）打包成 16 bit，存進同一組行緩衝：
+    --   兩個行緩衝存上一行、上兩行同一欄的標籤，標籤和左邊或上面兩個像素不同就是稜線
+    subtype label_t is std_logic_vector(7 downto 0);
+    subtype pair_t  is std_logic_vector(15 downto 0);   -- 背面標籤 & 正面標籤
+    type line_buf_t is array (0 to H_ACTIVE - 1) of pair_t;
+    signal lb1, lb2   : line_buf_t := (others => (others => '0'));
+    signal c1_rgb     : std_logic_vector(23 downto 0) := (others => '0');
+    signal c1_holo    : std_logic_vector(23 downto 0) := (others => '0');   -- 點雲的顏色
+    signal c1_lab     : label_t := (others => '0');
+    signal c1_blab    : label_t := (others => '0');
+    signal c1_x       : unsigned(11 downto 0) := (others => '0');
+    signal c1_y       : unsigned(1 downto 0)  := (others => '0');   -- 背面虛線用的座標低位元
+    signal c1_de      : std_logic := '0';
+    signal c1_hs      : std_logic := '0';
+    signal c1_vs      : std_logic := '0';
+    signal up1        : pair_t := (others => '0');    -- (x, y-1)，與 c1 對齊
+    signal c2_rgb     : std_logic_vector(23 downto 0) := (others => '0');
+    signal c2_holo    : std_logic_vector(23 downto 0) := (others => '0');
+    signal c2_lab     : label_t := (others => '0');
+    signal c2_blab    : label_t := (others => '0');
+    signal c2_x       : unsigned(1 downto 0) := (others => '0');
+    signal c2_y       : unsigned(1 downto 0) := (others => '0');
+    signal c2_de      : std_logic := '0';
+    signal c2_hs      : std_logic := '0';
+    signal c2_vs      : std_logic := '0';
+    signal c2_up1     : pair_t := (others => '0');    -- 以下與 c2 對齊：(x, y-1)
+    signal c2_up2     : pair_t := (others => '0');    -- (x, y-2)
+    signal c2_left1   : label_t := (others => '0');   -- (x-1, y)
+    signal c2_left2   : label_t := (others => '0');   -- (x-2, y)
+    signal c2_bleft1  : label_t := (others => '0');   -- 背面標籤的 (x-1, y)
+    signal c2_bleft2  : label_t := (others => '0');   -- 背面標籤的 (x-2, y)
 
     -- RGB888 視訊串流（HDMI 接點）
-    signal stream_rgb : std_logic_vector(23 downto 0) := (others => '0');
-    signal stream_de  : std_logic := '0';
-    signal stream_hs  : std_logic := '0';
-    signal stream_vs  : std_logic := '0';
+    signal stream_rgb   : std_logic_vector(23 downto 0) := (others => '0');
+    signal stream_label : label_t := (others => '0');
+    signal stream_de    : std_logic := '0';
+    signal stream_hs    : std_logic := '0';
+    signal stream_vs    : std_logic := '0';
 
     -- VGA 輸出暫存器
     signal r_reg  : std_logic_vector(RED_BITS - 1 downto 0)   := (others => '0');
@@ -223,7 +264,7 @@ begin
                 mode      <= '0';
                 dir       <= '0';
                 speed_sel <= "01";
-                style     <= "00";
+                holo      <= '0';
             else
                 if p_mode = '1' then
                     mode <= not mode;
@@ -234,13 +275,8 @@ begin
                 if p_speed = '1' then
                     speed_sel <= speed_sel + 1;
                 end if;
-                -- style：00 -> 01 -> 10 -> 00
                 if p_style = '1' then
-                    if style = "10" then
-                        style <= "00";
-                    else
-                        style <= style + 1;
-                    end if;
+                    holo <= not holo;
                 end if;
             end if;
         end if;
@@ -248,26 +284,31 @@ begin
 
 
     --------------------------------------------------
-    -- 4. 角度：每幀在垂直遮沒開頭更新，下一拍通知多邊形單元重算 W
+    -- 4. 角度：每幀在垂直遮沒開頭更新，下一拍通知多面體單元重算 W
     --------------------------------------------------
     process(clk)
-        variable step : signed(ANGLE_BITS - 1 downto 0);
+        variable step_x : signed(ANGLE_BITS - 1 downto 0);
+        variable step_y : signed(ANGLE_BITS - 1 downto 0);
     begin
         if rising_edge(clk) then
             load <= '0';
             if reset = '1' then
-                ang       <= (others => (others => '0'));
+                ang_x     <= (others => (others => '0'));
+                ang_y     <= (others => (others => '0'));
                 frame_cnt <= (others => '0');
             elsif frame_tick = '1' then
                 load      <= '1';
                 frame_cnt <= frame_cnt + 1;
                 if running = '1' then
                     for k in 0 to SHAPES - 1 loop
-                        step := shift_left(to_signed(SPIN_A(k), ANGLE_BITS), to_integer(speed_sel));
+                        step_x := shift_left(to_signed(SPIN_X_A(k), ANGLE_BITS), to_integer(speed_sel));
+                        step_y := shift_left(to_signed(SPIN_Y_A(k), ANGLE_BITS), to_integer(speed_sel));
                         if dir = '1' then
-                            step := -step;
+                            step_x := -step_x;
+                            step_y := -step_y;
                         end if;
-                        ang(k) <= ang(k) + unsigned(step);
+                        ang_x(k) <= ang_x(k) + unsigned(step_x);
+                        ang_y(k) <= ang_y(k) + unsigned(step_y);
                     end loop;
                 end if;
             end if;
@@ -276,23 +317,25 @@ begin
 
 
     --------------------------------------------------
-    -- 5. 多邊形矩陣管線 ×3
+    -- 5. 多面體管線 ×3
     --------------------------------------------------
-    gen_poly : for k in 0 to SHAPES - 1 generate
-        u_poly : entity work.HW_3_poly
+    gen_solid : for k in 0 to SHAPES - 1 generate
+        u_solid : entity work.HW_3_solid
             generic map (
-                SIDES => SIDES_A(k), CX => CX_A(k), CY => CY,
-                RADIUS => RADIUS, EDGE_W => EDGE_W, ANGLE_BITS => ANGLE_BITS
+                SOLID => SOLID_A(k), SEED => k, CX => CX_A(k), CY => CY, RADIUS => RADIUS,
+                BASE_RGB => BASE_C(k), ANGLE_BITS => ANGLE_BITS, TREE_LV => TREE_LV
             )
             port map (
-                clk => clk, reset => reset, ce => pix_ce, load => load, angle => ang(k),
-                x => t_x, y => t_y, inside => inside(k), edge => edge(k)
+                clk => clk, reset => reset, ce => pix_ce, load => load,
+                ang_x => ang_x(k), ang_y => ang_y(k), x => t_x, y => t_y,
+                inside => inside(k), face => face(k), bface => bface(k), rgb => shade(k),
+                dot_f => dot_f(k), dot_b => dot_b(k)
             );
     end generate;
 
 
     --------------------------------------------------
-    -- 6. 延遲線：座標與同步訊號延遲 POLY_LAT 個 ce，與 inside / edge 對齊
+    -- 6. 延遲線：座標與同步訊號延遲 SOLID_LAT 個 ce，與 inside / face 對齊
     --------------------------------------------------
     process(clk)
     begin
@@ -303,7 +346,7 @@ begin
                 de_d(1) <= t_de;
                 hs_d(1) <= t_hs;
                 vs_d(1) <= t_vs;
-                for i in 2 to POLY_LAT loop
+                for i in 2 to SOLID_LAT loop
                     x_d(i)  <= x_d(i - 1);
                     y_d(i)  <= y_d(i - 1);
                     de_d(i) <= de_d(i - 1);
@@ -316,20 +359,34 @@ begin
 
 
     --------------------------------------------------
-    -- 7. 合成 -> 遮沒期間輸出黑色
-    --    基本模式：黑底，R、G、B 色塊各自點亮一個顏色通道，重疊處加色（黃、青、洋紅、白）
-    --    進階模式：背景格線 -> 由下層往上層蓋形狀
-    --      style 00 填色 + 外框、01 只填色、10 只有外框
+    -- 7. 合成（3 級）-> 遮沒期間輸出黑色
+    --    C1：基本模式畫色塊；進階模式由下層往上層蓋形狀，得到打光顏色、點雲顏色與正面 / 背面標籤；
+    --        讀寫第一個行緩衝
+    --    C2：讀寫第二個行緩衝，左邊兩個像素的標籤
+    --    C3：標籤和 (x-1)、(x-2)、(y-1)、(y-2) 任一個不同 -> 稜線（2 像素寬）
+    --      實心：正面稜線白色，其餘為打光顏色
+    --      全息：正面稜線白色；正面或背面落在點上 -> 形體顏色；背面稜線 -> 形體顏色的虛線；其餘黑色
     --------------------------------------------------
     process(clk)
-        variable pix : std_logic_vector(23 downto 0);
-        variable xi  : integer range 0 to 4095;
-        variable yi  : integer range 0 to 4095;
+        variable pix  : std_logic_vector(23 downto 0);
+        variable hpix : std_logic_vector(23 downto 0);
+        variable lab  : label_t;
+        variable blab : label_t;
+        variable xi   : integer range 0 to 4095;
+        variable yi   : integer range 0 to 4095;
+        variable ridge : boolean;
+        variable bridge : boolean;
+        variable dash : unsigned(1 downto 0);
+        variable outp : std_logic_vector(23 downto 0);
     begin
         if rising_edge(clk) then
             if pix_ce = '1' then
-                xi := to_integer(x_d(POLY_LAT));
-                yi := to_integer(y_d(POLY_LAT));
+                -- C1
+                xi  := to_integer(x_d(SOLID_LAT));
+                yi  := to_integer(y_d(SOLID_LAT));
+                lab  := (others => '0');
+                blab := (others => '0');
+                hpix := BG_C;
 
                 if mode = '0' then
                     pix := (others => '0');
@@ -344,29 +401,89 @@ begin
                     end if;
 
                 else
-                    if x_d(POLY_LAT)(4 downto 0) = "00000" or y_d(POLY_LAT)(4 downto 0) = "00000" then
-                        pix := GRID_C;
-                    else
-                        pix := BG_C;
-                    end if;
-
+                    pix := BG_C;
                     for k in SHAPES - 1 downto 0 loop
-                        if edge(k) = '1' and style /= "01" then
-                            pix := EDGE_C(k);
-                        elsif inside(k) = '1' and style /= "10" then
-                            pix := FILL_C(k);
+                        if inside(k) = '1' then
+                            pix  := shade(k);
+                            lab  := '1' & std_logic_vector(to_unsigned(k, 2)) & std_logic_vector(face(k));
+                            blab := '1' & std_logic_vector(to_unsigned(k, 2)) & std_logic_vector(bface(k));
+                            if dot_f(k) = '1' or dot_b(k) = '1' then
+                                hpix := BASE_C(k);
+                            else
+                                hpix := BG_C;
+                            end if;
                         end if;
                     end loop;
                 end if;
 
-                if de_d(POLY_LAT) = '0' then
-                    pix := (others => '0');
+                if de_d(SOLID_LAT) = '0' then
+                    lab  := (others => '0');
+                    blab := (others => '0');
                 end if;
 
-                stream_rgb <= pix;
-                stream_de  <= de_d(POLY_LAT);
-                stream_hs  <= hs_d(POLY_LAT);
-                stream_vs  <= vs_d(POLY_LAT);
+                c1_rgb  <= pix;
+                c1_holo <= hpix;
+                c1_lab  <= lab;
+                c1_blab <= blab;
+                c1_x   <= x_d(SOLID_LAT);
+                c1_y   <= y_d(SOLID_LAT)(1 downto 0);
+                c1_de  <= de_d(SOLID_LAT);
+                c1_hs  <= hs_d(SOLID_LAT);
+                c1_vs  <= vs_d(SOLID_LAT);
+                if de_d(SOLID_LAT) = '1' then
+                    up1     <= lb1(xi);
+                    lb1(xi) <= blab & lab;
+                end if;
+
+                -- C2：lb2 存的是上一行讀出的 up1，再讀出來就是上兩行
+                c2_rgb    <= c1_rgb;
+                c2_holo   <= c1_holo;
+                c2_lab    <= c1_lab;
+                c2_blab   <= c1_blab;
+                c2_bleft1 <= c2_blab;
+                c2_bleft2 <= c2_bleft1;
+                c2_x     <= c1_x(1 downto 0);
+                c2_y     <= c1_y;
+                c2_de    <= c1_de;
+                c2_hs    <= c1_hs;
+                c2_vs    <= c1_vs;
+                c2_up1   <= up1;
+                c2_left1 <= c2_lab;
+                c2_left2 <= c2_left1;
+                if c1_de = '1' then
+                    c2_up2                <= lb2(to_integer(c1_x));
+                    lb2(to_integer(c1_x)) <= up1;
+                end if;
+
+                -- C3
+                ridge  := c2_lab /= c2_left1 or c2_lab /= c2_left2 or
+                          c2_lab /= c2_up1(7 downto 0) or c2_lab /= c2_up2(7 downto 0);
+                bridge := c2_blab /= c2_bleft1 or c2_blab /= c2_bleft2 or
+                          c2_blab /= c2_up1(15 downto 8) or c2_blab /= c2_up2(15 downto 8);
+                dash   := c2_x + c2_y;              -- (x + y) mod 4 < 2 才畫：虛線
+                outp   := c2_rgb;
+                if mode = '1' then
+                    if ridge then
+                        outp := EDGE_C;
+                    elsif holo = '1' then
+                        if c2_holo /= BG_C then
+                            outp := c2_holo;
+                        elsif bridge and c2_blab(7) = '1' and dash(1) = '0' then
+                            outp := BASE_C(to_integer(unsigned(c2_blab(6 downto 5))) mod SHAPES);
+                        else
+                            outp := BG_C;
+                        end if;
+                    end if;
+                end if;
+                if c2_de = '0' then
+                    outp := (others => '0');
+                end if;
+
+                stream_rgb   <= outp;
+                stream_label <= c2_lab;
+                stream_de    <= c2_de;
+                stream_hs    <= c2_hs;
+                stream_vs    <= c2_vs;
             end if;
         end if;
     end process;
@@ -394,14 +511,14 @@ begin
     vga_hs <= hs_reg;
     vga_vs <= vs_reg;
 
-    -- LD0 旋轉圖形模式、LD1 轉動中、LD2 反轉、LD4..3 轉速、LD6..5 樣式、LD7 心跳（約每秒閃一次）
+    -- LD0 旋轉多面體模式、LD1 轉動中、LD2 反轉、LD4..3 轉速、LD5 全息點雲、LD7 心跳（約每秒閃一次）
     led(0) <= pol(mode, LED_ACTIVE_LOW);
     led(1) <= pol(running, LED_ACTIVE_LOW);
     led(2) <= pol(dir, LED_ACTIVE_LOW);
     led(3) <= pol(speed_sel(0), LED_ACTIVE_LOW);
     led(4) <= pol(speed_sel(1), LED_ACTIVE_LOW);
-    led(5) <= pol(style(0), LED_ACTIVE_LOW);
-    led(6) <= pol(style(1), LED_ACTIVE_LOW);
+    led(5) <= pol(holo, LED_ACTIVE_LOW);
+    led(6) <= pol('0', LED_ACTIVE_LOW);
     led(7) <= pol(frame_cnt(5), LED_ACTIVE_LOW);
 
 end Behavioral;
