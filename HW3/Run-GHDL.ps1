@@ -34,6 +34,7 @@ $sources = @(
     'src\HW_3_timing.vhd',
     'src\HW_3_btn.vhd',
     'src\HW_3_solid.vhd',
+    'src\HW_3_hdmi_cfg.vhd',
     'src\HW_3.vhd',
     'sim\HW_3_tb.vhd'
 ) | ForEach-Object { Join-Path $hw $_ }

@@ -6,11 +6,14 @@ use IEEE.NUMERIC_STD.ALL;
 --   基本模式（reset 後）：R、G、B 三個矩形色塊，位置與大小由 generic 設定，重疊處加色混合
 --   進階模式（按 BTNU 切換）：立方體、八面體、十二面體各自翻滾，由 HW_3_solid 逐像素算出看到的面
 --     BTND 切換兩種樣式：實心打光 + 白色稜線，或全息點雲（正面與背面的稀疏點、背面稜線畫虛線，可透視）
---   內部資料流：時序 -> 多面體管線 -> 合成 RGB888 視訊串流 -> VGA 輸出級（取各色高位元）
---   視訊串流（stream_*）與 VGA 腳位無關，日後 HDMI 編碼器接在這裡
+--   內部資料流：時序 -> 多面體管線 -> 合成 RGB888 視訊串流 -+-> VGA 輸出級（取各色高位元）
+--                                                            +-> HDMI 輸出級（YCbCr 4:2:2 + 同步 + 像素時脈 -> ADV7511）
+--   ADV7511 由 HW_3_hdmi_cfg 經 I2C 設定
+--   EGO-XZ7 沒有 VGA 接頭：VGA 的 generic、埠、暫存器與輸出級先註解掉（標 [VGA]），
+--     外接 VGA 時把標 [VGA] 的行取消註解，並在 HW_3.xdc 填 VGA 腳位
 entity HW_3 is
     Generic (
-        PIX_DIV         : positive := 4;          -- 100 MHz / 4 = 25 MHz 像素率；獨立像素時脈時設 1
+        PIX_DIV         : positive := 4;          -- 100 MHz / 4 = 25 MHz 像素率；HDMI 需要 >= 2（像素時脈由 clk 分頻）
         H_ACTIVE        : positive := 640;        -- 640×480@60（像素時脈 25.175 MHz，用 25 MHz 近似）
         H_FP            : positive := 16;
         H_SYNC          : positive := 96;
@@ -20,15 +23,19 @@ entity HW_3 is
         V_SYNC          : positive := 2;
         V_BP            : positive := 33;
         SYNC_ACTIVE_LOW : boolean  := true;       -- 640×480@60 的 hs / vs 為負極性
-        RED_BITS        : positive := 1;          -- 每色位元數（1 ~ 8）：基本模式要求 1 bit；多面體不限，
-        GREEN_BITS      : positive := 1;          --   接多位元電阻 DAC 時加大（內部全程 RGB888）
-        BLUE_BITS       : positive := 1;
+        -- [VGA] RED_BITS        : positive := 1;          -- 每色位元數（1 ~ 8）：基本模式要求 1 bit；多面體不限，
+        -- [VGA] GREEN_BITS      : positive := 1;          --   接多位元電阻 DAC 時加大（內部全程 RGB888）
+        -- [VGA] BLUE_BITS       : positive := 1;
         -- 基本模式的色塊：左上角 (X, Y)、寬 W、高 H（像素）
-        R_X : natural := 60;   R_Y : natural := 160;  R_W : natural := 160;  R_H : natural := 160;
-        G_X : natural := 240;  G_Y : natural := 160;  G_W : natural := 160;  G_H : natural := 160;
-        B_X : natural := 420;  B_Y : natural := 160;  B_W : natural := 160;  B_H : natural := 160;
+        --   預設把畫面直切三等分、不留黑：640 / 3 不整除，寬取 214、212、214，讓交界落在偶數 x，
+        --   HDMI 的 4:2:2 一對像素（偶、奇）共用色度，交界不會跨在一對中間而出現色邊
+        R_X : natural := 0;    R_Y : natural := 0;    R_W : natural := 214;  R_H : natural := 480;
+        G_X : natural := 214;  G_Y : natural := 0;    G_W : natural := 212;  G_H : natural := 480;
+        B_X : natural := 426;  B_Y : natural := 0;    B_W : natural := 214;  B_H : natural := 480;
         ANGLE_BITS      : positive := 10;         -- 一圈 1024 步
         DEBOUNCE_CYCLES : positive := 2_000_000;  -- 20 ms
+        HDMI_CFG_DELAY  : positive := 2**24;      -- ADV7511 每輪設定之前等待的 clk 數（約 168 ms）
+        I2C_DIV         : positive := 250;        -- SCL = 100 MHz / (4 × 250) = 100 kHz
         BTN_ACTIVE_LOW  : boolean  := false;
         LED_ACTIVE_LOW  : boolean  := false
     );
@@ -40,11 +47,17 @@ entity HW_3 is
         btn_speed : in  STD_LOGIC;                -- 轉速 ×1 -> ×2 -> ×4 -> ×8
         btn_dir   : in  STD_LOGIC;                -- 反轉
         btn_style : in  STD_LOGIC;                -- 實心打光 + 稜線 <-> 全息點雲
-        vga_r     : out STD_LOGIC_VECTOR(RED_BITS - 1 downto 0);
-        vga_g     : out STD_LOGIC_VECTOR(GREEN_BITS - 1 downto 0);
-        vga_b     : out STD_LOGIC_VECTOR(BLUE_BITS - 1 downto 0);
-        vga_hs    : out STD_LOGIC;
-        vga_vs    : out STD_LOGIC;
+        -- [VGA] vga_r     : out STD_LOGIC_VECTOR(RED_BITS - 1 downto 0);
+        -- [VGA] vga_g     : out STD_LOGIC_VECTOR(GREEN_BITS - 1 downto 0);
+        -- [VGA] vga_b     : out STD_LOGIC_VECTOR(BLUE_BITS - 1 downto 0);
+        -- [VGA] vga_hs    : out STD_LOGIC;
+        -- [VGA] vga_vs    : out STD_LOGIC;
+        hdmi_clk  : out   STD_LOGIC;              -- ADV7511 像素時脈（上升緣取樣）
+        hdmi_d    : out   STD_LOGIC_VECTOR(23 downto 0);   -- ADV7511 D23..D0：D23..16 Cb / Cr、D15..8 Y、D7..0 = 0
+        hdmi_hs   : out   STD_LOGIC;
+        hdmi_vs   : out   STD_LOGIC;
+        hdmi_scl  : out   STD_LOGIC;              -- ADV7511 設定用 I2C（開汲極：只拉低或放開）
+        hdmi_sda  : inout STD_LOGIC;
         led       : out STD_LOGIC_VECTOR(7 downto 0)
     );
 end HW_3;
@@ -151,7 +164,7 @@ architecture Behavioral of HW_3 is
     signal c2_bleft1  : label_t := (others => '0');   -- 背面標籤的 (x-1, y)
     signal c2_bleft2  : label_t := (others => '0');   -- 背面標籤的 (x-2, y)
 
-    -- RGB888 視訊串流（HDMI 接點）
+    -- RGB888 視訊串流（送給 HDMI 輸出級；接回 VGA 時兩個輸出級共用）
     signal stream_rgb   : std_logic_vector(23 downto 0) := (others => '0');
     signal stream_label : label_t := (others => '0');
     signal stream_de    : std_logic := '0';
@@ -159,11 +172,27 @@ architecture Behavioral of HW_3 is
     signal stream_vs    : std_logic := '0';
 
     -- VGA 輸出暫存器
-    signal r_reg  : std_logic_vector(RED_BITS - 1 downto 0)   := (others => '0');
-    signal g_reg  : std_logic_vector(GREEN_BITS - 1 downto 0) := (others => '0');
-    signal b_reg  : std_logic_vector(BLUE_BITS - 1 downto 0)  := (others => '0');
-    signal hs_reg : std_logic := '0';
-    signal vs_reg : std_logic := '0';
+    -- [VGA] signal r_reg  : std_logic_vector(RED_BITS - 1 downto 0)   := (others => '0');
+    -- [VGA] signal g_reg  : std_logic_vector(GREEN_BITS - 1 downto 0) := (others => '0');
+    -- [VGA] signal b_reg  : std_logic_vector(BLUE_BITS - 1 downto 0)  := (others => '0');
+    -- [VGA] signal hs_reg : std_logic := '0';
+    -- [VGA] signal vs_reg : std_logic := '0';
+
+    -- HDMI：RGB -> YCbCr（第一拍），再排成 4:2:2（第二拍）
+    signal ycc_y    : unsigned(7 downto 0) := (others => '0');
+    signal ycc_cb   : unsigned(7 downto 0) := (others => '0');
+    signal ycc_cr   : unsigned(7 downto 0) := (others => '0');
+    signal ycc_de   : std_logic := '0';
+    signal ycc_hs   : std_logic := '0';
+    signal ycc_vs   : std_logic := '0';
+    signal cr_sel   : std_logic := '0';           -- 0 = 這個像素送 Cb、1 = 送 Cr；每行第一個像素送 Cb
+
+    -- HDMI 輸出暫存器（放進 IOB，見 HW_3.xdc）：hd_reg(23..16) 色度 Cb / Cr、hd_reg(15..8) 亮度 Y
+    signal hd_reg   : std_logic_vector(23 downto 8) := (others => '0');
+    signal hhs_reg  : std_logic := '0';
+    signal hvs_reg  : std_logic := '0';
+    signal hclk_reg : std_logic := '0';
+    signal hdmi_ok  : std_logic;                  -- ADV7511 最近一輪設定全部收到 ACK
 
     function pol(v : std_logic; active_low : boolean) return std_logic is
     begin
@@ -176,9 +205,9 @@ architecture Behavioral of HW_3 is
 
 begin
 
-    assert RED_BITS <= 8 and GREEN_BITS <= 8 and BLUE_BITS <= 8
-        report "VGA color depth must be at most 8 bits per channel"
-        severity failure;
+    -- [VGA] assert RED_BITS <= 8 and GREEN_BITS <= 8 and BLUE_BITS <= 8
+    -- [VGA]     report "VGA color depth must be at most 8 bits per channel"
+    -- [VGA]     severity failure;
 
     assert R_X + R_W <= H_ACTIVE and G_X + G_W <= H_ACTIVE and B_X + B_W <= H_ACTIVE and
            R_Y + R_H <= V_ACTIVE and G_Y + G_H <= V_ACTIVE and B_Y + B_H <= V_ACTIVE
@@ -187,6 +216,10 @@ begin
 
     assert ANGLE_BITS >= 6
         report "ANGLE_BITS must be at least 6 to hold SPIN x 8 steps per frame"
+        severity failure;
+
+    assert PIX_DIV >= 2
+        report "HDMI pixel clock is divided from clk, PIX_DIV must be at least 2"
         severity failure;
 
     --------------------------------------------------
@@ -490,35 +523,103 @@ begin
 
 
     --------------------------------------------------
-    -- 8. VGA 輸出級：取各色高位元、調整同步極性
+    -- 8. VGA 輸出級：取各色高位元、調整同步極性（EGO-XZ7 沒有 VGA 接頭，先註解掉）
+    --------------------------------------------------
+    -- [VGA] process(clk)
+    -- [VGA] begin
+    -- [VGA]     if rising_edge(clk) then
+    -- [VGA]         if pix_ce = '1' then
+    -- [VGA]             r_reg  <= stream_rgb(23 downto 24 - RED_BITS);
+    -- [VGA]             g_reg  <= stream_rgb(15 downto 16 - GREEN_BITS);
+    -- [VGA]             b_reg  <= stream_rgb(7 downto 8 - BLUE_BITS);
+    -- [VGA]             hs_reg <= pol(stream_hs, SYNC_ACTIVE_LOW);
+    -- [VGA]             vs_reg <= pol(stream_vs, SYNC_ACTIVE_LOW);
+    -- [VGA]         end if;
+    -- [VGA]     end if;
+    -- [VGA] end process;
+    -- [VGA]
+    -- [VGA] vga_r  <= r_reg;
+    -- [VGA] vga_g  <= g_reg;
+    -- [VGA] vga_b  <= b_reg;
+    -- [VGA] vga_hs <= hs_reg;
+    -- [VGA] vga_vs <= vs_reg;
+
+
+    --------------------------------------------------
+    -- 9. HDMI 輸出級：板子上的 ADV7511 負責 TMDS 編碼，FPGA 只送影像資料、hs、vs 與像素時脈
+    --    ADV7511 的輸入匯流排有 36 bit，24 bit RGB 時 R 在 D35..28，但板子只接了 D23..D0，
+    --    所以照 ZedBoard 的接法送 16 bit YCbCr 4:2:2：D23..16 = Cb / Cr 輪流、D15..8 = Y，D7..0 不用；
+    --    ADV7511 再用內建的 CSC 轉回 RGB（HW_3_hdmi_cfg 設定）
+    --    第一拍：RGB -> YCbCr，BT.709、有限範圍（Y 16 ~ 235、Cb / Cr 16 ~ 240），係數 × 256，
+    --      先加偏移量讓被除數不為負，除以 256 就是右移
+    --    第二拍：每行第一個像素送 Cb，之後 Cr、Cb 輪流（不濾波，直接取該像素的色度）
+    --    像素時脈由 div_cnt 解出，在資料換值後半個像素才上升，
+    --    ADV7511 在上升緣取樣，前後各有半個像素（20 ns）的餘裕
+    --    板子沒有接 DE，由 ADV7511 的 DE 產生器依 hs、vs 自己算（HW_3_hdmi_cfg 設定）
     --------------------------------------------------
     process(clk)
+        variable r, g, b : natural range 0 to 255;
     begin
         if rising_edge(clk) then
             if pix_ce = '1' then
-                r_reg  <= stream_rgb(23 downto 24 - RED_BITS);
-                g_reg  <= stream_rgb(15 downto 16 - GREEN_BITS);
-                b_reg  <= stream_rgb(7 downto 8 - BLUE_BITS);
-                hs_reg <= pol(stream_hs, SYNC_ACTIVE_LOW);
-                vs_reg <= pol(stream_vs, SYNC_ACTIVE_LOW);
+                -- 第一拍
+                r := to_integer(unsigned(stream_rgb(23 downto 16)));
+                g := to_integer(unsigned(stream_rgb(15 downto 8)));
+                b := to_integer(unsigned(stream_rgb(7 downto 0)));
+                ycc_y  <= to_unsigned((4224 + 47 * r + 157 * g + 16 * b) / 256, 8);
+                ycc_cb <= to_unsigned((32896 - 26 * r - 87 * g + 112 * b) / 256, 8);
+                ycc_cr <= to_unsigned((32896 + 112 * r - 102 * g - 10 * b) / 256, 8);
+                ycc_de <= stream_de;
+                ycc_hs <= stream_hs;
+                ycc_vs <= stream_vs;
+
+                -- 第二拍
+                if ycc_de = '1' then
+                    if cr_sel = '0' then
+                        hd_reg(23 downto 16) <= std_logic_vector(ycc_cb);
+                    else
+                        hd_reg(23 downto 16) <= std_logic_vector(ycc_cr);
+                    end if;
+                    hd_reg(15 downto 8) <= std_logic_vector(ycc_y);
+                    cr_sel <= not cr_sel;
+                else
+                    hd_reg <= (others => '0');
+                    cr_sel <= '0';
+                end if;
+                hhs_reg <= pol(ycc_hs, SYNC_ACTIVE_LOW);
+                hvs_reg <= pol(ycc_vs, SYNC_ACTIVE_LOW);
+            end if;
+            if div_cnt >= PIX_DIV / 2 then
+                hclk_reg <= '1';
+            else
+                hclk_reg <= '0';
             end if;
         end if;
     end process;
 
-    vga_r  <= r_reg;
-    vga_g  <= g_reg;
-    vga_b  <= b_reg;
-    vga_hs <= hs_reg;
-    vga_vs <= vs_reg;
+    hdmi_d   <= hd_reg & x"00";
+    hdmi_hs  <= hhs_reg;
+    hdmi_vs  <= hvs_reg;
+    hdmi_clk <= hclk_reg;
 
-    -- LD0 旋轉多面體模式、LD1 轉動中、LD2 反轉、LD4..3 轉速、LD5 全息點雲、LD7 心跳（約每秒閃一次）
+    u_hdmi_cfg : entity work.HW_3_hdmi_cfg
+        generic map (
+            I2C_DIV => I2C_DIV, START_DELAY => HDMI_CFG_DELAY,
+            H_ACTIVE => H_ACTIVE, V_ACTIVE => V_ACTIVE,
+            H_DE_DELAY => H_SYNC + H_BP, V_DE_DELAY => V_SYNC + V_BP,
+            SYNC_ACTIVE_LOW => SYNC_ACTIVE_LOW
+        )
+        port map (clk => clk, reset => reset, scl => hdmi_scl, sda => hdmi_sda, ok => hdmi_ok);
+
+    -- LD0 旋轉多面體模式、LD1 轉動中、LD2 反轉、LD4..3 轉速、LD5 全息點雲、LD6 ADV7511 設定成功、
+    -- LD7 心跳（約每秒閃一次）
     led(0) <= pol(mode, LED_ACTIVE_LOW);
     led(1) <= pol(running, LED_ACTIVE_LOW);
     led(2) <= pol(dir, LED_ACTIVE_LOW);
     led(3) <= pol(speed_sel(0), LED_ACTIVE_LOW);
     led(4) <= pol(speed_sel(1), LED_ACTIVE_LOW);
     led(5) <= pol(holo, LED_ACTIVE_LOW);
-    led(6) <= pol('0', LED_ACTIVE_LOW);
+    led(6) <= pol(hdmi_ok, LED_ACTIVE_LOW);
     led(7) <= pol(frame_cnt(5), LED_ACTIVE_LOW);
 
 end Behavioral;

@@ -6,8 +6,10 @@ use STD.TEXTIO.ALL;
 
 -- HW3 VGA 掃描自我檢查測試檔（對應 SPEC.md 第 9 節）
 --   以真實的 640×480@60 參數跑數幀：檢查 hs / vs 時序、基本模式的 RGB 色塊、
---   切換到旋轉多面體後，每個像素看到的面與浮點數光線投射的參考模型比對，並檢查樣式、VGA 輸出與暫停
+--   切換到旋轉多面體後，每個像素看到的面與浮點數光線投射的參考模型比對，並檢查樣式、HDMI 輸出與暫停
+--   EGO-XZ7 沒有 VGA 接頭，HW_3 的 VGA 埠已註解掉；VGA 相關的檢查標 [VGA]，接回 VGA 時一起取消註解
 --   畫面從 RGB888 視訊串流擷取（VHDL-2008 external name），存成 PPM 圖檔，可直接打開看
+--   HDMI：24 bit 輸出逐像素等於串流，像素時脈的週期與相位正確；ADV7511 模型收下 I2C 設定並檢查暫存器值
 --   本檔需以 VHDL 2008 編譯；全程約 9 幀（約 150 ms 模擬時間），結束時印出 PASS / FAIL
 entity HW_3_tb is
     Generic (
@@ -43,7 +45,7 @@ architecture Behavioral of HW_3_tb is
     constant EDGE_C  : std_logic_vector(23 downto 0) := x"FFFFFF";
     constant BG_C    : std_logic_vector(23 downto 0) := x"000000";
     constant BLK_C   : rgb_arr_t := (x"FF0000", x"00FF00", x"0000FF");
-    constant BLK_PIX : natural   := 160 * 160;  -- 預設色塊大小，三塊互不重疊
+    constant BLK_PIX : int_arr_t := (214 * 480, 212 * 480, 214 * 480);   -- 預設色塊：畫面直切三等分，加起來是整個畫面
     constant ANG_ONE : real      := 1024.0;     -- 一圈的角度步數（ANGLE_BITS = 10）
 
 
@@ -258,34 +260,141 @@ architecture Behavioral of HW_3_tb is
     signal btn_speed : std_logic := '0';
     signal btn_dir   : std_logic := '0';
     signal btn_style : std_logic := '0';
-    signal vga_r     : std_logic_vector(0 downto 0);
-    signal vga_g     : std_logic_vector(0 downto 0);
-    signal vga_b     : std_logic_vector(0 downto 0);
-    signal vga_hs    : std_logic;
-    signal vga_vs    : std_logic;
+    -- [VGA] signal vga_r     : std_logic_vector(0 downto 0);
+    -- [VGA] signal vga_g     : std_logic_vector(0 downto 0);
+    -- [VGA] signal vga_b     : std_logic_vector(0 downto 0);
+    -- [VGA] signal vga_hs    : std_logic;
+    -- [VGA] signal vga_vs    : std_logic;
     signal led       : std_logic_vector(7 downto 0);
+    signal hdmi_clk  : std_logic;
+    signal hdmi_d    : std_logic_vector(23 downto 0);
+    signal hdmi_hs   : std_logic;
+    signal hdmi_vs   : std_logic;
+    signal hdmi_scl  : std_logic;
+    signal hdmi_sda  : std_logic;
+    signal sda_ack   : std_logic := 'Z';         -- ADV7511 模型拉低 SDA 回 ACK
     signal done      : boolean := false;
     signal sync_err  : natural := 0;
     signal ang_x     : int_arr_t := (others => 0);   -- 角度模型（步數，一圈 1024）
     signal ang_y     : int_arr_t := (others => 0);
 
+    -- HDMI 輸出級的參考模型：RGB -> YCbCr（BT.709、有限範圍，係數 × 256），4:2:2 時偶數像素送 Cb、奇數送 Cr
+    --   回傳腳位上的 24 bit：D23..16 = Cb / Cr、D15..8 = Y、D7..0 = 0
+    function ycc422(pix : std_logic_vector(23 downto 0); odd : boolean) return std_logic_vector is
+        variable r, g, b, y, c : natural;
+    begin
+        r := to_integer(unsigned(pix(23 downto 16)));
+        g := to_integer(unsigned(pix(15 downto 8)));
+        b := to_integer(unsigned(pix(7 downto 0)));
+        y := (4224 + 47 * r + 157 * g + 16 * b) / 256;
+        if odd then
+            c := (32896 + 112 * r - 102 * g - 10 * b) / 256;
+        else
+            c := (32896 - 26 * r - 87 * g + 112 * b) / 256;
+        end if;
+        return std_logic_vector(to_unsigned(c, 8)) & std_logic_vector(to_unsigned(y, 8)) & x"00";
+    end function;
+
+    constant CFG_DELAY : positive := 1000;       -- ADV7511 每輪設定前等待的 clk 數（縮短，省模擬時間）
+    type reg_map_t is array (0 to 255) of integer range -1 to 255;
+    signal adv_reg   : reg_map_t := (others => -1);   -- ADV7511 模型收到的暫存器值，-1 = 沒寫過
+    signal i2c_n     : natural := 0;             -- 收到的寫入筆數
+    signal i2c_err   : natural := 0;             -- 裝置位址不對
+    signal hclk_n    : natural := 0;             -- 檢查過的像素時脈上升緣
+    signal hclk_err  : natural := 0;             -- 週期或 setup / hold 不對
+
 begin
 
     dut : entity work.HW_3
-        generic map (PIX_DIV => PIX_DIV, DEBOUNCE_CYCLES => DB)
+        generic map (PIX_DIV => PIX_DIV, DEBOUNCE_CYCLES => DB, HDMI_CFG_DELAY => CFG_DELAY)
         port map (
             clk => clk, reset => reset,
             btn_mode => btn_mode, sw_pause => sw_pause,
             btn_speed => btn_speed, btn_dir => btn_dir, btn_style => btn_style,
-            vga_r => vga_r, vga_g => vga_g, vga_b => vga_b, vga_hs => vga_hs, vga_vs => vga_vs,
+            -- [VGA] vga_r => vga_r, vga_g => vga_g, vga_b => vga_b, vga_hs => vga_hs, vga_vs => vga_vs,
+            hdmi_clk => hdmi_clk, hdmi_d => hdmi_d, hdmi_hs => hdmi_hs, hdmi_vs => hdmi_vs,
+            hdmi_scl => hdmi_scl, hdmi_sda => hdmi_sda,
             led => led
         );
 
     clk <= not clk after T / 2 when not done;
 
+    -- I2C 上拉
+    hdmi_scl <= 'H';
+    hdmi_sda <= 'H';
+    hdmi_sda <= sda_ack;
+
 
     --------------------------------------------------
-    -- 同步時序：hs / vs 為負極性，檢查脈波寬度與週期
+    -- ADV7511 模型（I2C 從端）：START 後收 3 個 byte，每個 byte 回 ACK，
+    --   位址為 0x72（0x39 + 寫入）時記下暫存器值
+    --------------------------------------------------
+    adv_model : process
+        variable sr   : std_logic_vector(23 downto 0);
+        variable errs : natural := 0;
+        variable n    : natural := 0;
+    begin
+        loop
+            wait until (falling_edge(hdmi_sda) and to_x01(hdmi_scl) = '1') or done;
+            exit when done;
+            for nb in 0 to 2 loop
+                for i in 7 downto 0 loop
+                    wait until rising_edge(hdmi_scl);
+                    sr := sr(22 downto 0) & to_x01(hdmi_sda);
+                end loop;
+                wait until falling_edge(hdmi_scl);
+                sda_ack <= '0';
+                wait until falling_edge(hdmi_scl);
+                sda_ack <= 'Z';
+            end loop;
+            if sr(23 downto 16) /= x"72" then
+                errs := errs + 1;
+            else
+                adv_reg(to_integer(unsigned(sr(15 downto 8)))) <= to_integer(unsigned(sr(7 downto 0)));
+            end if;
+            n := n + 1;
+            i2c_n   <= n;
+            i2c_err <= errs;
+        end loop;
+        wait;
+    end process;
+
+
+    --------------------------------------------------
+    -- HDMI 像素時脈：週期 = 一個像素；上升緣前後 TP / 4 內資料與同步不變
+    --------------------------------------------------
+    hdmi_chk : process
+        variable last_rise : time := 0 ns;
+        variable errs, n   : natural := 0;
+    begin
+        wait until reset = '0';
+        loop
+            wait until rising_edge(hdmi_clk) or done;
+            exit when done;
+            if n > 0 and now - last_rise /= TP then
+                errs := errs + 1;
+            end if;
+            last_rise := now;
+            if hdmi_d'last_event < TP / 4 or hdmi_hs'last_event < TP / 4 or hdmi_vs'last_event < TP / 4 then
+                errs := errs + 1;
+            end if;
+            -- [VGA] if hdmi_hs /= vga_hs or hdmi_vs /= vga_vs then
+                -- [VGA] errs := errs + 1;
+            -- [VGA] end if;
+            wait for TP / 4;
+            if hdmi_d'last_event < TP / 4 or hdmi_hs'last_event < TP / 4 or hdmi_vs'last_event < TP / 4 then
+                errs := errs + 1;
+            end if;
+            n := n + 1;
+            hclk_n   <= n;
+            hclk_err <= errs;
+        end loop;
+        wait;
+    end process;
+
+
+    --------------------------------------------------
+    -- 同步時序：HDMI 的 hs / vs 為負極性，檢查脈波寬度與週期
     --------------------------------------------------
     sync_chk : process
         variable hs_fall, vs_fall : time := 0 ns;
@@ -294,32 +403,32 @@ begin
     begin
         wait until reset = '0';
         loop
-            wait until falling_edge(vga_hs) or rising_edge(vga_hs) or
-                       falling_edge(vga_vs) or rising_edge(vga_vs) or done;
+            wait until falling_edge(hdmi_hs) or rising_edge(hdmi_hs) or
+                       falling_edge(hdmi_vs) or rising_edge(hdmi_vs) or done;
             exit when done;
 
-            if falling_edge(vga_hs) then
+            if falling_edge(hdmi_hs) then
                 if hs_seen and now - hs_fall /= H_TOTAL * TP then
                     report "hsync period " & time'image(now - hs_fall) severity error;
                     errs := errs + 1;
                 end if;
                 hs_fall := now;
                 hs_seen := true;
-            elsif rising_edge(vga_hs) and hs_seen then
+            elsif rising_edge(hdmi_hs) and hs_seen then
                 if now - hs_fall /= H_SYNC * TP then
                     report "hsync width " & time'image(now - hs_fall) severity error;
                     errs := errs + 1;
                 end if;
             end if;
 
-            if falling_edge(vga_vs) then
+            if falling_edge(hdmi_vs) then
                 if vs_seen and now - vs_fall /= V_TOTAL * H_TOTAL * TP then
                     report "vsync period " & time'image(now - vs_fall) severity error;
                     errs := errs + 1;
                 end if;
                 vs_fall := now;
                 vs_seen := true;
-            elsif rising_edge(vga_vs) and vs_seen then
+            elsif rising_edge(hdmi_vs) and vs_seen then
                 if now - vs_fall /= V_SYNC * H_TOTAL * TP then
                     report "vsync width " & time'image(now - vs_fall) severity error;
                     errs := errs + 1;
@@ -387,7 +496,8 @@ begin
         variable n_edge  : natural;            -- 稜線色像素
         variable n_extra : natural;            -- 既不是稜線也不是背景，且不在任何形狀內
         variable n_wire  : natural;            -- 不是稜線也不是背景色
-        variable n_vga   : natural;            -- VGA 輸出與串流的高位元不符
+        -- [VGA] variable n_vga   : natural;            -- VGA 輸出與串流的高位元不符
+        variable n_hdmi  : natural;            -- HDMI 的 24 bit 輸出與串流不符
         variable hash    : natural;
         variable hash0   : natural;
         variable ax, ay  : real_arr_t;         -- 擷取的那一幀用的角度（弧度）
@@ -400,18 +510,21 @@ begin
             wait for 4 * DB * T;
         end procedure;
 
-        -- 擷取下一個完整畫面：記下每個像素的標籤、統計顏色、檢查 VGA 輸出，需要時存成 PPM
-        --   rgb 是 RGB888 視訊串流，vga 是實際的 1 bit 腳位輸出（放大成 0 / 255）
+        -- 擷取下一個完整畫面：記下每個像素的標籤、統計顏色、檢查 HDMI 輸出，需要時存成 PPM
+        --   rgb 是 RGB888 視訊串流，hdmi 是實際送給 ADV7511 的亮度 Y（灰階）
         procedure capture(name : string; save : boolean) is
             file     f, fv     : text;
             variable l, lv     : line;
             variable pix       : std_logic_vector(23 downto 0);
             variable lab       : natural;
             variable n         : natural := 0;
-            variable want      : std_logic_vector(2 downto 0);   -- 上一個 ce 讀到的像素的各色高位元
-            variable got       : std_logic_vector(2 downto 0);
+            -- [VGA] variable want      : std_logic_vector(2 downto 0);   -- 上一個 ce 讀到的像素的各色高位元
+            variable want_ycc  : std_logic_vector(23 downto 0);  -- 上一個 ce 讀到的像素該有的 HDMI 輸出
+            variable want_ycc2 : std_logic_vector(23 downto 0);  -- 再上一個 ce 的（HDMI 比串流晚兩個 ce）
+            variable pend2     : boolean := false;
+            -- [VGA] variable got       : std_logic_vector(2 downto 0);
             variable pend      : boolean := false;
-            variable nv        : natural := 0;                   -- 已檢查的 VGA 像素數
+            variable nv        : natural := 0;                   -- 已檢查的 HDMI 像素數
             type seen_t is array (0 to SHAPES - 1, 0 to 31) of boolean;
             variable seen      : seen_t := (others => (others => false));
         begin
@@ -422,11 +535,12 @@ begin
             n_extra := 0;
             n_wire  := 0;
             n_shade := 0;
-            n_vga   := 0;
+            -- [VGA] n_vga   := 0;
+            n_hdmi  := 0;
             hash    := 0;
             if save then
                 file_open(f, OUT_DIR & name & ".ppm", write_mode);
-                file_open(fv, OUT_DIR & name & "_vga.ppm", write_mode);
+                file_open(fv, OUT_DIR & name & "_hdmi.ppm", write_mode);
                 write(l, string'("P3"));
                 writeline(f, l);
                 write(l, integer'image(H_ACTIVE) & " " & integer'image(V_ACTIVE));
@@ -449,25 +563,33 @@ begin
                 ay(k) := MATH_2_PI * real(ang_y(k)) / ANG_ONE;
             end loop;
 
-            -- VGA 腳位比串流晚一個 ce：每個 ce 先檢查上一個像素的 VGA 輸出，再讀這個像素
-            while n < NPIX or pend loop
+            -- HDMI 腳位比串流晚兩個 ce（YCbCr 轉換一拍、輸出暫存器一拍）、VGA 腳位晚一個 ce：
+            --   每個 ce 先檢查兩個 ce 之前讀到的像素的 HDMI 輸出（與上一個像素的 VGA 輸出），再讀這個像素
+            while n < NPIX or pend or pend2 loop
                 wait until rising_edge(clk);
                 if pix_ce = '1' then
-                    if pend then
-                        got := vga_r(0) & vga_g(0) & vga_b(0);
-                        if got /= want then
-                            n_vga := n_vga + 1;
+                    if pend2 then
+                        if hdmi_d /= want_ycc2 then
+                            n_hdmi := n_hdmi + 1;
                         end if;
                         nv := nv + 1;
                         if save then
-                            for c in 2 downto 0 loop
-                                if got(c) = '1' then write(lv, string'("255 ")); else write(lv, string'("0 ")); end if;
+                            for c in 0 to 2 loop
+                                write(lv, integer'image(to_integer(unsigned(hdmi_d(15 downto 8)))) & " ");
                             end loop;
                             if nv mod H_ACTIVE = 0 then
                                 writeline(fv, lv);
                             end if;
                         end if;
                     end if;
+                    pend2     := pend;
+                    want_ycc2 := want_ycc;
+                    -- [VGA] if pend then
+                        -- [VGA] got := vga_r(0) & vga_g(0) & vga_b(0);
+                        -- [VGA] if got /= want then
+                            -- [VGA] n_vga := n_vga + 1;
+                        -- [VGA] end if;
+                    -- [VGA] end if;
                     pend := false;
 
                     if stream_de = '1' and n < NPIX then
@@ -502,7 +624,8 @@ begin
                             pcls(n) := 0;
                         end if;
 
-                        want := pix(23) & pix(15) & pix(7);
+                        -- [VGA] want := pix(23) & pix(15) & pix(7);
+                        want_ycc := ycc422(pix, (n mod H_ACTIVE) mod 2 = 1);
                         pend := true;
 
                         hash := (hash * 7 + to_integer(unsigned(pix(23 downto 12))) +
@@ -531,10 +654,14 @@ begin
             if save then
                 file_close(f);
                 file_close(fv);
-                report "wrote " & OUT_DIR & name & ".ppm / " & name & "_vga.ppm";
+                report "wrote " & OUT_DIR & name & ".ppm / " & name & "_hdmi.ppm";
             end if;
-            if n_vga /= 0 then
-                report name & ": " & integer'image(n_vga) & " VGA pixels differ from the stream's top bits" severity error;
+            -- [VGA] if n_vga /= 0 then
+                -- [VGA] report name & ": " & integer'image(n_vga) & " VGA pixels differ from the stream's top bits" severity error;
+                -- [VGA] errors := errors + 1;
+            -- [VGA] end if;
+            if n_hdmi /= 0 then
+                report name & ": " & integer'image(n_hdmi) & " HDMI pixels differ from the stream" severity error;
                 errors := errors + 1;
             end if;
         end procedure;
@@ -661,15 +788,24 @@ begin
             end loop;
         end procedure;
 
+        procedure check_adv(a, v : natural) is
+        begin
+            if adv_reg(a) /= v then
+                report "ADV7511 register " & integer'image(a) & " = " & integer'image(adv_reg(a)) &
+                       ", expected " & integer'image(v) severity error;
+                errors := errors + 1;
+            end if;
+        end procedure;
+
     begin
         wait for 10 * T;
         reset <= '0';
 
-        -- 1. reset 後為基本模式：R、G、B 色塊各 160×160，沒有多面體
+        -- 1. reset 後為基本模式：R、G、B 色塊把畫面直切三等分（214、212、214 × 480），沒有黑色、沒有多面體
         capture("frame_basic", true);
         for k in 0 to SHAPES - 1 loop
             report "basic: block " & integer'image(k) & " pixels " & integer'image(blk(k));
-            if blk(k) /= BLK_PIX or area(k) /= 0 then
+            if blk(k) /= BLK_PIX(k) or area(k) /= 0 then
                 report "basic: block " & integer'image(k) & " wrong pixels" severity error;
                 errors := errors + 1;
             end if;
@@ -760,6 +896,38 @@ begin
         errors := errors + sync_err;
         if sync_err /= 0 then
             report integer'image(sync_err) & " sync timing errors" severity error;
+        end if;
+
+        -- 8. HDMI：24 bit 輸出已在每次擷取時逐像素比對；這裡檢查像素時脈與 ADV7511 的設定
+        report "HDMI: " & integer'image(hclk_n) & " pixel clocks checked, " & integer'image(i2c_n) & " I2C writes";
+        if hclk_err /= 0 or hclk_n = 0 then
+            report integer'image(hclk_err) & " HDMI pixel clock errors" severity error;
+            errors := errors + 1;
+        end if;
+        if i2c_err /= 0 or i2c_n < 47 then
+            report integer'image(i2c_err) & " I2C writes to a wrong address" severity error;
+            errors := errors + 1;
+        end if;
+        check_adv(16#D6#, 16#C0#);           -- HPD 視為一直有接
+        check_adv(16#41#, 16#10#);           -- 開啟電源
+        check_adv(16#15#, 16#01#);           -- YCbCr 4:2:2、分離同步
+        check_adv(16#16#, 16#38#);           -- 輸出 4:4:4、8 bit、輸入樣式 1、RGB
+        check_adv(16#48#, 16#08#);           -- 靠右對齊
+        check_adv(16#18#, 16#C7#);           -- CSC 開啟、縮放 ×4、A1 高位元
+        check_adv(16#1A#, 16#04#);           -- 最後一筆離開更新模式
+        check_adv(16#2E#, 16#1B#);           -- C4 = 0x1B77
+        check_adv(16#2F#, 16#77#);
+        check_adv(16#17#, 16#61#);           -- 同步低電位有效、DE 產生器開啟
+        check_adv(16#35#, 16#24#);           -- DE 產生器：hsync 延遲 144 = 0x24 << 2
+        check_adv(16#36#, 16#23#);           -- hsync 延遲低 2 位 0、vsync 延遲 35
+        check_adv(16#37#, 16#05#);           -- 寬 640 = 0x280：[11:7] = 5
+        check_adv(16#38#, 16#00#);           --   [6:0] = 0
+        check_adv(16#39#, 16#1E#);           -- 高 480 = 0x1E0：[11:4] = 0x1E
+        check_adv(16#3A#, 16#00#);           --   [3:0] = 0
+        check_adv(16#AF#, 16#04#);           -- DVI 模式
+        if led(6) /= '1' then
+            report "LD6 off: ADV7511 configuration not acknowledged" severity error;
+            errors := errors + 1;
         end if;
 
         if errors = 0 then
