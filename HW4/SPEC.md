@@ -28,13 +28,16 @@
 |---|---|---|---|---|
 | ① 1 ms 節拍 | 由 `clk` 除頻出 1 ms 單拍致能 | `HW_4.vhd` | `tick_cnt`、`tick_1ms` | §7.1 |
 | ② 按鈕介面 ×2、SW0 同步 | 同步、去彈跳、按下瞬間的單拍脈衝；SW0 兩級同步 | `HW_4_btn.vhd`、`HW_4.vhd` | `press_l`、`press_r`、`sw_speed_s` | §8 |
-| ③ 遊戲 FSM | 發球、移動、回擊判定、得分、勝負 | `HW_4.vhd` | `state`、`t_rel`、`step_cnt`、`step_ms`、`hit_pending`、`server`、`wait_cnt` | §4、§5、§7 |
-| ④ 球與計分暫存器 | 在 ③ 同一個 process 更新 | `HW_4.vhd` | `pos`、`to_left`、`score_l`、`score_r` | §4 |
-| ⑤ 1 Hz 閃爍 | 每 500 ms 翻轉一次，進入 POINT / OVER 時重新從「亮」開始 | `HW_4.vhd` | `blink_cnt`、`blink_on` | §6.2 |
-| ⑥ LED 輸出選擇 | 依狀態輸出球（one-hot）或分數長條，經暫存器輸出 | `HW_4.vhd` | `led_nxt`、`led_reg` | §6 |
+| 事件訊號 | 組合邏輯：把判定規則寫成一個個單拍事件 | `HW_4.vhd` | `serve_go`、`early`、`set_pending`、`hit_go`、`miss`、`lose`、`show_done`、`win`、`restart` | §4.3、§5 |
+| ③ 遊戲 FSM | 只負責切換狀態、記錄發球方與 POINT 顯示時間 | `HW_4.vhd` | `state`、`server`、`wait_cnt` | §5 |
+| ④ 球 | 發球、反向、加速、每 ms 推進 | `HW_4.vhd` | `pos`、`to_left`、`step_ms`、`step_cnt`、`t_rel`、`hit_pending` | §4、§7.2 |
+| ④ 計分 | 接球方輸時對方加 1 分；重新開局歸零 | `HW_4.vhd` | `score_l`、`score_r` | §4.5 |
+| ⑤ 1 Hz 閃爍 | 每 500 ms 翻轉一次，進入 POINT / OVER 時從「亮」開始 | `HW_4.vhd` | `blink_cnt`、`blink_on` | §6.2 |
+| ⑥ LED 輸出選擇 | 依狀態輸出球（one-hot）或分數長條，經暫存器輸出 | `HW_4.vhd` | `led_reg` | §6 |
 
 全部 process 由 `clk` 驅動，時序控制一律使用單拍致能脈衝（`tick_1ms`、`press_l`、`press_r`），
-不產生衍生時脈。
+不產生衍生時脈。程式只用基本寫法：沒有 function，process 內沒有 variable，每個 process 只管一組暫存器；
+各 process 之間靠上面的事件訊號溝通。
 
 ## 3. 介面
 
@@ -155,12 +158,18 @@ Elaboration 時以 `assert` 檢查：
 | `POINT` | 得分方長條，1 Hz 閃 | 無（按鈕忽略） | `wait_cnt` 滿 `SCORE_SHOW_MS` → `OVER` 或 `SERVE` |
 | `OVER` | 勝方長條，1 Hz 閃 | 任一按鈕 | 按下 → `SERVE`，比分歸零 |
 
-`PLAY` 中每個 clk 依以下優先順序檢查（同一拍最多發生一件事）：
+`PLAY` 中的判定寫成組合邏輯的事件訊號（`press_rx` = 接球方的按鍵）：
 
-1. 接球方 `press`：依 §4.3 判定為早按（→ `POINT`）、記下 `hit_pending`、或立即反向。
-2. `hit_pending = '1'` 且 `t_rel ≥ 0`：反向（早接在抵達的下一拍生效）。
-3. `tick_1ms` 且 `t_rel = HIT_LATE_MS` 且未回擊：出界（→ `POINT`）。
-4. `tick_1ms`：推進 `t_rel` 與 `step_cnt`，必要時移動 `pos`（§7.2）。
+| 事件 | 條件 | 結果 |
+|---|---|---|
+| `early` | `press_rx` 且 `hit_pending = '0'` 且 `t_rel < −HIT_EARLY_MS` | 接球方輸 → `POINT` |
+| `set_pending` | `press_rx` 且 `hit_pending = '0'` 且 `−HIT_EARLY_MS ≤ t_rel < 0` | 記下 `hit_pending` |
+| `hit_go` | `t_rel ≥ 0` 且（`press_rx` 或 `hit_pending = '1'`） | 反向（早接在抵達的下一拍生效） |
+| `miss` | `tick_1ms` 且 `t_rel = HIT_LATE_MS` 且沒有 `hit_go` | 接球方輸 → `POINT` |
+| 推進 | `tick_1ms` 且沒有 `lose`（= `early` 或 `miss`） | `t_rel` 加 1，必要時移動 `pos`（§7.2） |
+
+`early`、`set_pending`、`hit_go` 的 `t_rel` 範圍互不重疊，`miss` 又排除了 `hit_go`，所以同一拍最多
+只會發生一件事（`set_pending` 可以和「推進」同一拍）。
 
 ## 6. LED 顯示
 
@@ -175,10 +184,7 @@ Elaboration 時以 `assert` 檢查：
 | 右 | 2 | `○○○○○○●●` |
 | 右 | 5 | `○○○●●●●●` |
 
-```text
-bar_r(s) = 2^s − 1             -- 右玩家：led(s−1 downto 0) 亮
-bar_l(s) = bit_reverse(bar_r(s)) -- 左玩家：led(7 downto 8−s) 亮
-```
+程式中以兩張查表 `BAR_L(0 .. 8)`、`BAR_R(0 .. 8)` 直接列出 9 種圖樣，`BAR_L(score_l)` 即左玩家長條。
 
 POINT 只顯示得分方的分數，另一方的分數不顯示。
 
@@ -192,8 +198,8 @@ POINT 只顯示得分方的分數，另一方的分數不顯示。
 
 ### 6.3 輸出
 
-`led_nxt` 依狀態選擇：`SERVE` / `PLAY` 為 one-hot(`pos`)，`POINT` / `OVER` 為長條 AND `blink_on`；
-再與 `LED_ACTIVE_LOW` 做 XOR 後經暫存器 `led_reg` 輸出，避免組合邏輯毛刺。
+`led_reg` 依狀態選擇：`SERVE` / `PLAY` 為 one-hot(`pos`)，`POINT` / `OVER` 為長條（`blink_on = '0'` 時全暗），
+經暫存器輸出避免組合邏輯毛刺；`LED_ACTIVE_LOW = true` 時輸出端再整個反相。
 
 ## 7. 計時
 
@@ -316,7 +322,7 @@ LED 輸出為 reset 後第一拍的 SERVE 畫面（LD7 亮）。按鈕介面的 
 
 按鈕、開關與 LED 對時脈非同步，不做 I/O 時序分析（`set_false_path`）。
 
-實作結果（Vivado 2018.3）：196 LUT、142 FF，100 MHz 下 WNS ≈ +2.7 ns，沒有 latch。
+實作結果（Vivado 2018.3）：205 LUT、142 FF，100 MHz 下 WNS ≈ +3.1 ns，沒有 latch。
 
 ## 12. 待確認
 
