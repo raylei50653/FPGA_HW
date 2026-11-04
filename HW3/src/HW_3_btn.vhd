@@ -3,6 +3,9 @@ use IEEE.STD_LOGIC_1164.ALL;
 
 -- HW3 按鈕介面（規格見 HW3/SPEC.md §7）
 --   兩級同步 -> 連續 DEBOUNCE_CYCLES 拍穩定才更新 -> 按下瞬間輸出單拍脈衝
+--     sync1 / sync2：按鈕是非同步輸入，先過兩級正反器避免亞穩態
+--     stable      ：去彈跳後的按鈕狀態；sync2 和它不同時開始計數，中途又變回來就重數
+--     press       ：stable 由 0 變 1 的那一拍為 1（放開時不觸發）
 entity HW_3_btn is
     Generic (
         DEBOUNCE_CYCLES : positive := 2_000_000;  -- 100 MHz 下 20 ms

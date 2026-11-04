@@ -110,57 +110,73 @@ architecture Behavioral of HW_3_hdmi_cfg is
     constant REGS : reg_arr_t := reg_table;
     constant NREG : positive  := REGS'length;
 
+    -- 一筆寫入 = 3 個 byte，每個 byte 8 bit 加 1 個 ACK，共 27 個 bit（編號 0 ~ 26）
+    --   bit  0 ~  7  裝置位址 + W     bit  8  ACK
+    --   bit  9 ~ 16  暫存器位址       bit 17  ACK
+    --   bit 18 ~ 25  資料             bit 26  ACK
+    constant LAST_BIT : natural := 26;
+
+    function is_ack_bit(n : natural) return boolean is
+    begin
+        return n = 8 or n = 17 or n = 26;
+    end function;
+
+    -- WAIT_ST：兩輪之間的等待；START_ST / BIT_ST / STOP_ST：一筆寫入的三個部分
     type state_t is (WAIT_ST, START_ST, BIT_ST, STOP_ST);
-    signal state    : state_t := WAIT_ST;
-    signal wait_cnt : integer range 0 to START_DELAY - 1 := 0;
-    signal tick_cnt : integer range 0 to I2C_DIV - 1 := 0;
-    signal q        : integer range 0 to 3 := 0;          -- 一個 SCL 週期裡的第幾個四分之一
-    signal idx      : integer range 0 to NREG - 1 := 0;
-    signal bitn     : integer range 0 to 26 := 0;          -- 3 個 byte × (8 bit + ACK)
-    signal scl_o    : std_logic := '1';                    -- '1' = 放開
-    signal sda_o    : std_logic := '1';
-    signal sda_s    : std_logic := '1';
-    signal nack     : std_logic := '0';
-    signal ok_reg   : std_logic := '0';
-    signal word     : std_logic_vector(26 downto 0);       -- ACK 位置填 1（放開 SDA）
+    signal state      : state_t := WAIT_ST;
+    signal wait_cnt   : integer range 0 to START_DELAY - 1 := 0;
+    signal tick_cnt   : integer range 0 to I2C_DIV - 1 := 0;    -- 數到 I2C_DIV - 1 就前進四分之一個 SCL 週期
+    signal quarter    : integer range 0 to 3 := 0;              -- 一個 SCL 週期裡的第幾個四分之一
+    signal reg_idx    : integer range 0 to NREG - 1 := 0;       -- 正在寫暫存器表的第幾筆
+    signal bit_idx    : integer range 0 to LAST_BIT := 0;       -- 正在送 frame_bits 的第幾個 bit
+    signal scl_o      : std_logic := '1';                       -- '1' = 放開
+    signal sda_o      : std_logic := '1';
+    signal sda_in     : std_logic := '1';                       -- 讀回的 SDA（'Z' / 'H' 都當 1）
+    signal nack       : std_logic := '0';                       -- 這一輪有任一個 ACK 沒收到
+    signal ok_reg     : std_logic := '0';
+    signal frame_bits : std_logic_vector(LAST_BIT downto 0);    -- 一筆寫入要送的 27 bit，ACK 位置填 1（放開 SDA 讓 ADV7511 拉低）
 
 begin
 
-    word <= DEV_ADDR & '0' & '1' & REGS(idx).addr & '1' & REGS(idx).data & '1';
+    frame_bits <= DEV_ADDR & '0' & '1' & REGS(reg_idx).addr & '1' & REGS(reg_idx).data & '1';
 
     process(clk)
     begin
         if rising_edge(clk) then
             if sda = '0' then
-                sda_s <= '0';
+                sda_in <= '0';
             else
-                sda_s <= '1';
+                sda_in <= '1';
             end if;
 
             if reset = '1' then
                 state    <= WAIT_ST;
                 wait_cnt <= 0;
                 tick_cnt <= 0;
-                q        <= 0;
-                idx      <= 0;
-                bitn     <= 0;
+                quarter  <= 0;
+                reg_idx  <= 0;
+                bit_idx  <= 0;
                 scl_o    <= '1';
                 sda_o    <= '1';
                 nack     <= '0';
                 ok_reg   <= '0';
+
+            -- 兩輪之間：匯流排閒置（SCL、SDA 都放開），數完 START_DELAY 從第一筆開始
             elsif state = WAIT_ST then
                 scl_o <= '1';
                 sda_o <= '1';
                 if wait_cnt = START_DELAY - 1 then
                     wait_cnt <= 0;
                     tick_cnt <= 0;
-                    q        <= 0;
-                    idx      <= 0;
+                    quarter  <= 0;
+                    reg_idx  <= 0;
                     nack     <= '0';
                     state    <= START_ST;
                 else
                     wait_cnt <= wait_cnt + 1;
                 end if;
+
+            -- 其他狀態每四分之一個 SCL 週期走一步
             elsif tick_cnt /= I2C_DIV - 1 then
                 tick_cnt <= tick_cnt + 1;
             else
@@ -168,65 +184,65 @@ begin
                 case state is
                     -- START：SCL 高時把 SDA 拉低，再拉低 SCL
                     when START_ST =>
-                        case q is
+                        case quarter is
                             when 0 =>
-                                scl_o <= '1';
-                                sda_o <= '1';
-                                q     <= 1;
+                                scl_o   <= '1';
+                                sda_o   <= '1';
+                                quarter <= 1;
                             when 1 =>
-                                sda_o <= '0';
-                                q     <= 2;
+                                sda_o   <= '0';
+                                quarter <= 2;
                             when others =>
-                                scl_o <= '0';
-                                bitn  <= 0;
-                                q     <= 0;
-                                state <= BIT_ST;
+                                scl_o   <= '0';
+                                bit_idx <= 0;
+                                quarter <= 0;
+                                state   <= BIT_ST;
                         end case;
 
-                    -- 每個 bit：SCL 低時換 SDA，SCL 高的中間讀 ACK
+                    -- 每個 bit：SCL 低時換 SDA，SCL 拉高，SCL 高的中間讀 ACK，再拉低 SCL
                     when BIT_ST =>
-                        case q is
+                        case quarter is
                             when 0 =>
-                                sda_o <= word(26 - bitn);
-                                q     <= 1;
+                                sda_o   <= frame_bits(LAST_BIT - bit_idx);
+                                quarter <= 1;
                             when 1 =>
-                                scl_o <= '1';
-                                q     <= 2;
+                                scl_o   <= '1';
+                                quarter <= 2;
                             when 2 =>
-                                if (bitn = 8 or bitn = 17 or bitn = 26) and sda_s /= '0' then
+                                if is_ack_bit(bit_idx) and sda_in /= '0' then
                                     nack <= '1';
                                 end if;
-                                q <= 3;
+                                quarter <= 3;
                             when others =>
-                                scl_o <= '0';
-                                q     <= 0;
-                                if bitn = 26 then
+                                scl_o   <= '0';
+                                quarter <= 0;
+                                if bit_idx = LAST_BIT then
                                     state <= STOP_ST;
                                 else
-                                    bitn <= bitn + 1;
+                                    bit_idx <= bit_idx + 1;
                                 end if;
                         end case;
 
-                    -- STOP：SCL 高時放開 SDA
+                    -- STOP：SDA 先拉低，SCL 拉高後再放開 SDA；接著寫下一筆，或整輪結束回到 WAIT_ST
                     when STOP_ST =>
-                        case q is
+                        case quarter is
                             when 0 =>
-                                sda_o <= '0';
-                                q     <= 1;
+                                sda_o   <= '0';
+                                quarter <= 1;
                             when 1 =>
-                                scl_o <= '1';
-                                q     <= 2;
+                                scl_o   <= '1';
+                                quarter <= 2;
                             when 2 =>
-                                sda_o <= '1';
-                                q     <= 3;
+                                sda_o   <= '1';
+                                quarter <= 3;
                             when others =>
-                                q <= 0;
-                                if idx = NREG - 1 then
+                                quarter <= 0;
+                                if reg_idx = NREG - 1 then
                                     ok_reg <= not nack;
                                     state  <= WAIT_ST;
                                 else
-                                    idx   <= idx + 1;
-                                    state <= START_ST;
+                                    reg_idx <= reg_idx + 1;
+                                    state   <= START_ST;
                                 end if;
                         end case;
 
@@ -237,6 +253,7 @@ begin
         end if;
     end process;
 
+    -- 開汲極：只拉低或放開（'Z'），高電位靠板子上的提升電阻
     scl <= '0' when scl_o = '0' else 'Z';
     sda <= '0' when sda_o = '0' else 'Z';
     ok  <= ok_reg;
