@@ -2,7 +2,7 @@ library IEEE;
 use IEEE.STD_LOGIC_1164.ALL;
 
 -- HW4 LED 乒乓球測試檔（驗證計畫見 HW4/SPEC.md §10）
---   generic 縮短：1 ms = 10 clk（10 ns），step 20 ms → 加速到 8 ms，判定窗 ±10 ms，閃爍半週期 5 ms，
+--   generic 縮短：1 ms = 10 clk（10 ns），球速 慢 20 ms／快 10 ms，判定窗 ±10 ms，閃爍半週期 5 ms，
 --   POINT 20 ms，WIN_SCORE = 3。
 --   內部訊號（t_rel、pos、score…）以 VHDL-2008 external name 讀取，因此需以 VHDL 2008 編譯。
 --   dut_a 為高電位有效版；dut_b 為 LED_ACTIVE_LOW = BTN_ACTIVE_LOW = true 版，輸入反相、輸出應全程反相。
@@ -15,9 +15,8 @@ architecture sim of HW_4_tb is
     constant CLK_PERIOD : time := 10 ns;
     constant MS         : time := 100 ns;     -- CLK_FREQ_HZ = 10_000：1 ms = 10 clk
 
-    constant STEP_INIT  : integer := 20;
-    constant STEP_MIN   : integer := 8;
-    constant STEP_DEC   : integer := 4;
+    constant STEP_SLOW  : integer := 20;
+    constant STEP_FAST  : integer := 10;
     constant EARLY      : integer := 10;
     constant LATE       : integer := 10;
     constant HALF       : integer := 5;
@@ -49,7 +48,7 @@ begin
     dut_a : entity work.HW_4
         generic map (
             CLK_FREQ_HZ => 10_000, DEBOUNCE_MS => 2,
-            STEP_MS_INIT => STEP_INIT, STEP_MS_MIN => STEP_MIN, STEP_MS_DEC => STEP_DEC,
+            STEP_MS_SLOW => STEP_SLOW, STEP_MS_FAST => STEP_FAST,
             HIT_EARLY_MS => EARLY, HIT_LATE_MS => LATE, WIN_SCORE => WIN,
             BLINK_HALF_MS => HALF, SCORE_SHOW_MS => SHOW,
             LED_ACTIVE_LOW => false, BTN_ACTIVE_LOW => false)
@@ -59,7 +58,7 @@ begin
     dut_b : entity work.HW_4
         generic map (
             CLK_FREQ_HZ => 10_000, DEBOUNCE_MS => 2,
-            STEP_MS_INIT => STEP_INIT, STEP_MS_MIN => STEP_MIN, STEP_MS_DEC => STEP_DEC,
+            STEP_MS_SLOW => STEP_SLOW, STEP_MS_FAST => STEP_FAST,
             HIT_EARLY_MS => EARLY, HIT_LATE_MS => LATE, WIN_SCORE => WIN,
             BLINK_HALF_MS => HALF, SCORE_SHOW_MS => SHOW,
             LED_ACTIVE_LOW => true, BTN_ACTIVE_LOW => true)
@@ -86,13 +85,13 @@ begin
     end process;
 
     stim : process
-        alias t_rel   is << signal .HW_4_tb.dut_a.t_rel       : integer range -7 * STEP_INIT to LATE >>;
+        alias t_rel   is << signal .HW_4_tb.dut_a.t_rel       : integer range -7 * STEP_SLOW to LATE >>;
         alias pos     is << signal .HW_4_tb.dut_a.pos         : integer range 0 to 7 >>;
         alias to_left is << signal .HW_4_tb.dut_a.to_left     : std_logic >>;
         alias score_l is << signal .HW_4_tb.dut_a.score_l     : integer range 0 to WIN >>;
         alias score_r is << signal .HW_4_tb.dut_a.score_r     : integer range 0 to WIN >>;
         alias server  is << signal .HW_4_tb.dut_a.server      : std_logic >>;
-        alias step_ms is << signal .HW_4_tb.dut_a.step_ms     : integer range STEP_MIN to STEP_INIT >>;
+        alias step_ms is << signal .HW_4_tb.dut_a.step_ms     : integer range STEP_FAST to STEP_SLOW >>;
         alias pending is << signal .HW_4_tb.dut_a.hit_pending : std_logic >>;
         alias press_l is << signal .HW_4_tb.dut_a.press_l     : std_logic >>;
         alias press_r is << signal .HW_4_tb.dut_a.press_r     : std_logic >>;
@@ -189,12 +188,13 @@ begin
         wait for 1 ns;
         btn_l <= '0';
         check(to_left = '0', "serve: ball should head right");
-        check(t_rel = -7 * STEP_INIT, "serve: t_rel should start at -7 * step");
+        check(step_ms = STEP_SLOW, "SW0 down at the serve: slow speed");
+        check(t_rel = -7 * STEP_SLOW, "serve: t_rel should start at -7 * step");
         for k in 6 downto 0 loop
             wait until pos = k;
             t1 := now;
             if k < 6 then
-                check(t1 - t0 = STEP_INIT * MS, "step time at LD" & integer'image(k));
+                check(t1 - t0 = STEP_SLOW * MS, "step time at LD" & integer'image(k));
             end if;
             t0 := t1;
             clocks(2);
@@ -205,7 +205,7 @@ begin
         report "T4 late hit at +HIT_LATE_MS";
         hit_at(false, LATE);
         check(to_left = '1', "late hit at +LATE should return the ball");
-        check(step_ms = STEP_INIT, "SW0 off: no speed-up");
+        check(step_ms = STEP_SLOW, "a return keeps the ball speed");
         let_go(false);
 
         ------------------------------------------------------------
@@ -218,24 +218,17 @@ begin
         check(pos = 7, "pending hit should reverse the ball only at LD7");
 
         ------------------------------------------------------------
-        report "T6 speed-up with SW0";
+        report "T6 SW0 flipped mid-rally: speed only changes at the next serve";
         sw_speed <= '1';
         hit_at(false, 0);
-        check(step_ms = 16 and t_rel = -7 * 16, "speed-up 20 -> 16");
+        check(step_ms = STEP_SLOW and t_rel = -7 * STEP_SLOW, "SW0 must not change speed mid-rally");
         let_go(false);
         hit_at(true, 0);
-        check(step_ms = 12, "speed-up 16 -> 12");
+        check(step_ms = STEP_SLOW, "SW0 must not change speed mid-rally");
         let_go(true);
-        hit_at(false, 0);
-        check(step_ms = 8, "speed-up 12 -> 8");
-        let_go(false);
-        hit_at(true, 0);
-        check(step_ms = STEP_MIN, "speed-up clamps at STEP_MS_MIN");
-        let_go(true);
-        sw_speed <= '0';
 
         ------------------------------------------------------------
-        report "T7 early press loses; score bar blinks at 1 Hz; ball speed resets";
+        report "T7 early press loses; score bar blinks at 1 Hz";
         hit_at(false, -EARLY - 1);
         t0 := now - 1 ns;
         clocks(1);                                       -- lose 是暫存器輸出，計分晚 1 clk
@@ -255,9 +248,14 @@ begin
         check(pos = 7 and score_l = 1, "button pressed in POINT must not serve");
 
         ------------------------------------------------------------
-        report "T8 miss: out of bounds after +HIT_LATE_MS";
+        report "T8 fast serve (SW0 up); miss: out of bounds after +HIT_LATE_MS";
         push(true);
-        check(step_ms = STEP_INIT, "serve resets ball speed");
+        check(step_ms = STEP_FAST, "SW0 up at the serve: fast speed");
+        wait until pos = 5;
+        t0 := now;
+        wait until pos = 4;
+        check(now - t0 = STEP_FAST * MS, "fast step time");
+        sw_speed <= '0';                                 -- 之後的發球回到慢速
         wait until pos = 0;
         t0 := now;
         wait until score_l = 2;
@@ -271,6 +269,7 @@ begin
         report "T9 the player moving away is ignored; right scores";
         wait for t0 + 25 * MS - now;                  -- POINT 結束，左方發球
         push(true);                                      -- 左發球
+        check(step_ms = STEP_SLOW, "SW0 down again: next serve is slow");
         push(true);                                      -- 球遠離左方：忽略
         check(pending = '0' and to_left = '0' and score_r = 0, "non-receiver press must be ignored");
         hit_at(false, 5);

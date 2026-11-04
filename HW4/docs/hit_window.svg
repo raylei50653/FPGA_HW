@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 680 228" width="680" height="228" role="img" aria-label="HW4 回擊判定窗：以右玩家、step_ms = 200 ms 為例，球在時間 0 抵達邊界 LD0；到達前後各 250 ms 內按下為有效回擊，更早按下判輸，到達後 250 ms 仍未按則出界判輸">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 680 228" width="680" height="228" role="img" aria-label="HW4 回擊判定窗：以右玩家、快速 250 ms／格為例，球在時間 0 抵達邊界 LD0；到達前後各 250 ms 內按下為有效回擊，更早按下判輸，到達後 250 ms 仍未按則出界判輸">
   <style>
     .led { fill: #f6f8fa; stroke: #8c959f; stroke-width: 1; }
     .edge { fill: #fbefff; stroke: #8250df; stroke-width: 1.2; }
@@ -20,11 +20,10 @@
     }
   </style>
 
-  <!-- 球的位置（時間軸 1 ms = 0.4 px，0 ms 在 x = 400） -->
-  <rect class="led" x="80"  y="40" width="80" height="34" rx="4"/><text class="s" x="120" y="57">LD4</text>
-  <rect class="led" x="160" y="40" width="80" height="34" rx="4"/><text class="s" x="200" y="57">LD3</text>
-  <rect class="led" x="240" y="40" width="80" height="34" rx="4"/><text class="s" x="280" y="57">LD2</text>
-  <rect class="led" x="320" y="40" width="80" height="34" rx="4"/><text class="s" x="360" y="57">LD1</text>
+  <!-- 球的位置（時間軸 1 ms = 0.4 px，0 ms 在 x = 400；快速 250 ms／格 = 100 px） -->
+  <rect class="led" x="100" y="40" width="100" height="34" rx="4"/><text class="s" x="150" y="57">LD3</text>
+  <rect class="led" x="200" y="40" width="100" height="34" rx="4"/><text class="s" x="250" y="57">LD2</text>
+  <rect class="led" x="300" y="40" width="100" height="34" rx="4"/><text class="s" x="350" y="57">LD1</text>
   <rect class="edge" x="400" y="40" width="100" height="34" rx="4"/><text class="t" x="450" y="57">LD0 邊界</text>
   <rect class="gone" x="500" y="40" width="100" height="34" rx="4"/><text class="s" x="550" y="57">出界</text>
 
@@ -41,5 +40,5 @@
   <text class="s" x="300" y="172">−250 ms</text>
   <text class="s" x="400" y="172">0 到達</text>
   <text class="s" x="500" y="172">+250 ms</text>
-  <text class="s" x="340" y="208">右玩家視角，以 step_ms = 200 ms 為例；判定窗固定 ±250 ms，與球速無關</text>
+  <text class="s" x="340" y="208">右玩家視角，以快速 250 ms／格為例；判定窗固定 ±250 ms，與球速無關</text>
 </svg>

@@ -34,7 +34,7 @@
   <rect class="box" x="20" y="120" width="120" height="56" rx="6"/>
   <text class="t" x="80" y="144">BTNR</text><text class="s" x="80" y="164">右玩家</text>
   <rect class="box" x="20" y="200" width="120" height="56" rx="6"/>
-  <text class="t" x="80" y="224">SW0</text><text class="s" x="80" y="244">加速開關</text>
+  <text class="t" x="80" y="224">SW0</text><text class="s" x="80" y="244">球速快 / 慢</text>
   <rect class="box" x="20" y="280" width="120" height="56" rx="6"/>
   <text class="t" x="80" y="304">clk 100 MHz</text><text class="s" x="80" y="324">BTNC = reset</text>
 

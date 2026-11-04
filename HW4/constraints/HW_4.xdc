@@ -13,7 +13,7 @@ set_property -dict { PACKAGE_PIN N15 IOSTANDARD LVCMOS25 } [get_ports btn_l]    
 set_property -dict { PACKAGE_PIN R18 IOSTANDARD LVCMOS25 } [get_ports btn_r]    ;# BTNR 右玩家
 
 ## 開關：撥上為高電位
-set_property -dict { PACKAGE_PIN F22 IOSTANDARD LVCMOS25 } [get_ports sw_speed] ;# SW0 回擊加速
+set_property -dict { PACKAGE_PIN F22 IOSTANDARD LVCMOS25 } [get_ports sw_speed] ;# SW0 球速：撥下 500 ms、撥上 250 ms
 
 ## LED：高電位點亮（LED_ACTIVE_LOW = false）；LD7 = 左端、LD0 = 右端
 set_property -dict { PACKAGE_PIN T22 IOSTANDARD LVCMOS33 } [get_ports {led[0]}] ;# LD0

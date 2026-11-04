@@ -36,7 +36,7 @@
   <line class="e" x1="410" y1="88" x2="478" y2="88" marker-end="url(#a)"/>
   <text class="s" x="444" y="74">漏接/早按</text>
   <path class="e" d="M315,116 C315,158 365,158 365,118" marker-end="url(#a)"/>
-  <text class="s" x="340" y="172">判定窗內按下：反向、加速</text>
+  <text class="s" x="340" y="172">判定窗內按下：反向</text>
   <path class="e" d="M555,60 L555,32 L130,32 L130,58" marker-end="url(#a)"/>
   <text class="s" x="340" y="20">閃 2 s 後、未達勝分：得分方發球</text>
   <line class="e" x1="555" y1="116" x2="555" y2="198" marker-end="url(#a)"/>

@@ -17,7 +17,7 @@ LD0（右）之間來回；球抵達自己這端邊界的前後 **±250 ms** 內
 |---|---|
 | BTNL | 左玩家：發球（輪到左方時）、回擊（球往左時） |
 | BTNR | 右玩家：發球（輪到右方時）、回擊（球往右時） |
-| SW0 | 撥上：每次回擊球速加快（300 → 100 ms／格），每次發球回到原速 |
+| SW0 | 球速：撥下慢速 500 ms／格、撥上快速 250 ms／格（發球時決定，這一球打完前不變） |
 | BTNC | reset：比分歸零、左方發球 |
 
 1. Reset 後 LD7 恆亮：左方按 BTNL 發球，球往右移。
@@ -37,14 +37,15 @@ LD0（右）之間來回；球抵達自己這端邊界的前後 **±250 ms** 內
 | ① 1 ms 節拍 | 所有遊戲時間的基準 | §7.1 |
 | ② 按鈕介面 ×2、SW0 同步 | 同步、20 ms 去彈跳，按下瞬間一個脈衝；按住不會重複 | §8.2 |
 | ③ 遊戲 FSM | SERVE / PLAY / POINT / OVER，只負責切換狀態 | §5 |
-| ④ 球 | 發球、依 `t_rel` 判定早按／回擊／出界、加速、每 ms 推進；輸了送出 `lose` | §4、§5、§7.2 |
+| ④ 判定 | 一個組合邏輯 process：依 `t_rel` 決定這一拍是發球、回擊、判輸（`foul`）還是推進 | §4.3、§5 |
+| ④ 球的暫存器 | `to_left`、`step_ms`、`t_rel`、`hit_pending`、`step_cnt`、`pos`、`lose` 各一個 process | §4、§7.2 |
 | ④ 計分 | `score_l`、`score_r` | §4.5 |
 | ⑤ 1 Hz 閃爍 | 分數長條閃爍 | §6.2 |
 | ⑥ LED 輸出選擇 | 球（one-hot）或分數長條，經暫存器輸出 | §6 |
 
 ![HW4 狀態機](docs/fsm.svg)
 
-主要 generic：`STEP_MS_INIT`、`STEP_MS_MIN`、`STEP_MS_DEC`（球速）、`HIT_EARLY_MS`、`HIT_LATE_MS`
+主要 generic：`STEP_MS_SLOW`、`STEP_MS_FAST`（球速）、`HIT_EARLY_MS`、`HIT_LATE_MS`
 （判定窗）、`WIN_SCORE`（勝分，1 ~ 8）、`BLINK_HALF_MS`、`SCORE_SHOW_MS`，預設值見 SPEC §3.1。
 
 ## 檔案
@@ -78,6 +79,6 @@ LD0（右）之間來回；球抵達自己這端邊界的前後 **±250 ms** 內
 
 - [x] 規格（`SPEC.md`）
 - [x] 設計原始碼、測試檔（GHDL：`HW_4_tb PASS`）
-- [x] Vivado 2018.3 實作：223 LUT、143 FF，WNS +3.0 ns
+- [x] Vivado 2018.3 實作：168 LUT、138 FF，WNS +2.9 ns
 - [ ] 上板確認 LED 左右順序（LD7 是否在左）
 - [ ] 上板試玩，調整球速與判定窗
