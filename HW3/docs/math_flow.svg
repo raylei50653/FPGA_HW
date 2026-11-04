@@ -1,0 +1,157 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 1530" width="900" height="1530" font-family="'Noto Sans TC','Microsoft JhengHei','PingFang TC',sans-serif" font-size="13">
+<defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#374151"/></marker><marker id="ag" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#7c3aed"/></marker></defs>
+<rect width="900" height="1530" fill="#ffffff"/>
+<text x="20" y="30" font-size="18" fill="#1f2937" font-weight="bold" text-anchor="start">HW_3_solid 的數學流程（一個形體）</text>
+<text x="20" y="52" font-size="12.5" fill="#4b5563" font-weight="normal" text-anchor="start">灰：合成時就算好的常數　藍：每幀算一次　綠：每個像素算一次　橘：合成與輸出　（§ 為 SPEC 的章節）</text>
+<rect x="8" y="66" width="884" height="96" rx="10" fill="#f3f4f6" stroke="#9ca3af" stroke-opacity="0.35"/>
+<text x="20" y="87" font-size="14" fill="#374151" font-weight="bold" text-anchor="start" paint-order="stroke" stroke="#f3f4f6" stroke-width="5" stroke-linejoin="round">常數（elaboration 時以浮點數算好，變成表格）</text>
+<rect x="20" y="96" width="250" height="58" rx="6" fill="#ffffff" stroke="#9ca3af" stroke-width="1.6"/>
+<text x="30" y="115" font-size="13" fill="#374151" font-weight="bold" text-anchor="start">每個面的向量 n0ₖ、t1₀ₖ、t2₀ₖ</text>
+<text x="262" y="114" font-size="11" fill="#6b7280" font-weight="normal" text-anchor="end">§5.2</text>
+<text x="30" y="135" font-size="12.5" fill="#1f2937" font-weight="normal" text-anchor="start">法向量與兩個切向量，已套初始傾斜 T</text>
+<rect x="285" y="96" width="130" height="58" rx="6" fill="#ffffff" stroke="#9ca3af" stroke-width="1.6"/>
+<text x="295" y="115" font-size="13" fill="#374151" font-weight="bold" text-anchor="start">sin ROM</text>
+<text x="295" y="135" font-size="12.5" fill="#1f2937" font-weight="normal" text-anchor="start">1024 筆 = 一圈</text>
+<rect x="430" y="96" width="130" height="58" rx="6" fill="#ffffff" stroke="#9ca3af" stroke-width="1.6"/>
+<text x="440" y="115" font-size="13" fill="#374151" font-weight="bold" text-anchor="start">內切球半徑 a</text>
+<text x="440" y="135" font-size="12.5" fill="#1f2937" font-weight="normal" text-anchor="start">中心到每個面的距離</text>
+<rect x="575" y="96" width="140" height="58" rx="6" fill="#ffffff" stroke="#9ca3af" stroke-width="1.6"/>
+<text x="585" y="115" font-size="13" fill="#374151" font-weight="bold" text-anchor="start">光源方向 L</text>
+<text x="585" y="135" font-size="12.5" fill="#1f2937" font-weight="normal" text-anchor="start">左上前方的單位向量</text>
+<rect x="730" y="96" width="150" height="58" rx="6" fill="#ffffff" stroke="#9ca3af" stroke-width="1.6"/>
+<text x="740" y="115" font-size="13" fill="#374151" font-weight="bold" text-anchor="start">底色 BASE_RGB</text>
+<text x="740" y="135" font-size="12.5" fill="#1f2937" font-weight="normal" text-anchor="start">紅 / 綠 / 藍</text>
+<rect x="8" y="176" width="884" height="528" rx="10" fill="#eff6ff" stroke="#2563eb" stroke-opacity="0.35"/>
+<text x="20" y="197" font-size="14" fill="#2563eb" font-weight="bold" text-anchor="start" paint-order="stroke" stroke="#eff6ff" stroke-width="5" stroke-linejoin="round">每幀一次：垂直遮沒時，用一個乘累加器照排程表，對每個面 k 跑一遍（§5.5）</text>
+<rect x="60" y="212" width="150" height="50" rx="6" fill="#ffffff" stroke="#2563eb" stroke-width="1.6"/>
+<text x="70" y="231" font-size="13" fill="#2563eb" font-weight="bold" text-anchor="start">角度 α、β</text>
+<text x="202" y="230" font-size="11" fill="#6b7280" font-weight="normal" text-anchor="end">§6.2</text>
+<text x="70" y="251" font-size="12.5" fill="#1f2937" font-weight="normal" text-anchor="start">每幀加上轉速</text>
+<rect x="240" y="212" width="340" height="50" rx="6" fill="#ffffff" stroke="#2563eb" stroke-width="1.6"/>
+<text x="250" y="231" font-size="13" fill="#2563eb" font-weight="bold" text-anchor="start">查 sin ROM</text>
+<text x="250" y="251" font-size="12.5" fill="#1f2937" font-weight="normal" text-anchor="start">cα、sα、cβ、sβ　（cos θ = sin(θ + 1/4 圈)）</text>
+<line x1="210" y1="237" x2="240" y2="237" stroke="#374151" stroke-width="1.6" marker-end="url(#a)"/>
+<line x1="350" y1="154" x2="350" y2="212" stroke="#374151" stroke-width="1.6" marker-end="url(#a)"/>
+<rect x="20" y="290" width="560" height="72" rx="6" fill="#ffffff" stroke="#2563eb" stroke-width="1.6"/>
+<text x="30" y="309" font-size="13" fill="#2563eb" font-weight="bold" text-anchor="start">① 轉法向量　n = Rx(α) · Ry(β) · n0ₖ</text>
+<text x="572" y="308" font-size="11" fill="#6b7280" font-weight="normal" text-anchor="end">§5.2</text>
+<text x="30" y="329" font-size="12.5" fill="#1f2937" font-weight="normal" text-anchor="start">先繞 y：nx = cβ·nx0 + sβ·nz0　　 w = cβ·nz0 − sβ·nx0</text>
+<text x="30" y="348" font-size="12.5" fill="#1f2937" font-weight="normal" text-anchor="start">再繞 x：ny = cα·ny0 − sα·w　　　 nz = sα·ny0 + cα·w</text>
+<rect x="600" y="290" width="280" height="72" rx="6" fill="#ffffff" stroke="#2563eb" stroke-width="1.6"/>
+<text x="610" y="309" font-size="13" fill="#2563eb" font-weight="bold" text-anchor="start">⑤ 轉切向量（同一個旋轉）</text>
+<text x="872" y="308" font-size="11" fill="#6b7280" font-weight="normal" text-anchor="end">§5.7</text>
+<text x="610" y="329" font-size="12.5" fill="#1f2937" font-weight="normal" text-anchor="start">t1 = Rx(α) · Ry(β) · t1₀ₖ</text>
+<text x="610" y="348" font-size="12.5" fill="#1f2937" font-weight="normal" text-anchor="start">t2 = Rx(α) · Ry(β) · t2₀ₖ</text>
+<line x1="40" y1="154" x2="40" y2="290" stroke="#374151" stroke-width="1.6" marker-end="url(#a)"/>
+<text x="46" y="280" font-size="12" fill="#374151" font-weight="normal" text-anchor="start" paint-order="stroke" stroke="#eff6ff" stroke-width="5" stroke-linejoin="round">n0ₖ</text>
+<line x1="410" y1="262" x2="410" y2="290" stroke="#374151" stroke-width="1.6" marker-end="url(#a)"/>
+<path d="M580,237 L740,237 L740,290" fill="none" stroke="#374151" stroke-width="1.6" marker-end="url(#a)"/>
+<path d="M255,154 L255,180 L860,180 L860,290" fill="none" stroke="#374151" stroke-width="1.6" marker-end="url(#a)"/>
+<text x="866" y="205" font-size="12" fill="#374151" font-weight="normal" text-anchor="end" paint-order="stroke" stroke="#eff6ff" stroke-width="5" stroke-linejoin="round">t1₀ₖ</text>
+<text x="866" y="221" font-size="12" fill="#374151" font-weight="normal" text-anchor="end" paint-order="stroke" stroke="#eff6ff" stroke-width="5" stroke-linejoin="round">t2₀ₖ</text>
+<rect x="20" y="392" width="270" height="96" rx="6" fill="#ffffff" stroke="#2563eb" stroke-width="1.6"/>
+<text x="30" y="411" font-size="13" fill="#2563eb" font-weight="bold" text-anchor="start">② 光照</text>
+<text x="282" y="410" font-size="11" fill="#6b7280" font-weight="normal" text-anchor="end">§5.3</text>
+<text x="30" y="431" font-size="12.5" fill="#1f2937" font-weight="normal" text-anchor="start">lit = max(0, n · L)</text>
+<text x="30" y="450" font-size="12.5" fill="#1f2937" font-weight="normal" text-anchor="start">bright = 1/4 + 3/4 · lit</text>
+<text x="30" y="469" font-size="12.5" fill="#1f2937" font-weight="normal" text-anchor="start">rgbₖ = BASE_RGB × bright</text>
+<rect x="310" y="392" width="270" height="96" rx="6" fill="#ffffff" stroke="#2563eb" stroke-width="1.6"/>
+<text x="320" y="411" font-size="13" fill="#2563eb" font-weight="bold" text-anchor="start">③ 分類與倒數</text>
+<text x="572" y="410" font-size="11" fill="#6b7280" font-weight="normal" text-anchor="end">§5.1、§5.4</text>
+<text x="320" y="431" font-size="12.5" fill="#1f2937" font-weight="normal" text-anchor="start">nz ≤ −1/256 → 正面（朝向觀眾）</text>
+<text x="320" y="450" font-size="12.5" fill="#1f2937" font-weight="normal" text-anchor="start">nz ≥ +1/256 → 背面，其餘 → 側面</text>
+<text x="320" y="469" font-size="12.5" fill="#1f2937" font-weight="normal" text-anchor="start">q = 1 / |nz|　（除法，28 拍）</text>
+<line x1="150" y1="362" x2="150" y2="392" stroke="#374151" stroke-width="1.6" marker-end="url(#a)"/>
+<line x1="445" y1="362" x2="445" y2="392" stroke="#374151" stroke-width="1.6" marker-end="url(#a)"/>
+<rect x="360" y="512" width="220" height="96" rx="6" fill="#ffffff" stroke="#2563eb" stroke-width="1.6"/>
+<text x="370" y="531" font-size="13" fill="#2563eb" font-weight="bold" text-anchor="start">④ W 的第 k 列 (Aₖ, Bₖ, Cₖ)</text>
+<text x="572" y="530" font-size="11" fill="#6b7280" font-weight="normal" text-anchor="end">§5.1</text>
+<text x="370" y="551" font-size="12.5" fill="#1f2937" font-weight="normal" text-anchor="start">正面：(−a, nx, ny) × q</text>
+<text x="370" y="570" font-size="12.5" fill="#1f2937" font-weight="normal" text-anchor="start">背面：( a, −nx, −ny) × q</text>
+<text x="370" y="589" font-size="12.5" fill="#1f2937" font-weight="normal" text-anchor="start">側面：(−a, nx, ny)</text>
+<rect x="600" y="512" width="280" height="96" rx="6" fill="#ffffff" stroke="#2563eb" stroke-width="1.6"/>
+<text x="610" y="531" font-size="13" fill="#2563eb" font-weight="bold" text-anchor="start">⑥ 面座標係數</text>
+<text x="872" y="530" font-size="11" fill="#6b7280" font-weight="normal" text-anchor="end">§5.7</text>
+<text x="610" y="551" font-size="12.5" fill="#1f2937" font-weight="normal" text-anchor="start">Ux = t1x + t1z·B　Uy = t1y + t1z·C</text>
+<text x="610" y="570" font-size="12.5" fill="#1f2937" font-weight="normal" text-anchor="start">U0 = t1z·A</text>
+<text x="610" y="589" font-size="12.5" fill="#1f2937" font-weight="normal" text-anchor="start">Vx、Vy、V0 同理，用 t2</text>
+<line x1="470" y1="488" x2="470" y2="512" stroke="#374151" stroke-width="1.6" marker-end="url(#a)"/>
+<line x1="740" y1="362" x2="740" y2="512" stroke="#374151" stroke-width="1.6" marker-end="url(#a)"/>
+<line x1="580" y1="560" x2="600" y2="560" stroke="#374151" stroke-width="1.6" marker-end="url(#a)"/>
+<rect x="20" y="634" width="860" height="60" rx="6" fill="#ffffff" stroke="#7c3aed" stroke-width="2"/>
+<text x="30" y="652" font-size="12.5" fill="#7c3aed" font-weight="bold" text-anchor="start" paint-order="stroke" stroke="#ffffff" stroke-width="5" stroke-linejoin="round">每個面一筆的表格（每幀寫一次，像素管線一直讀）</text>
+<rect x="24" y="660" width="262" height="28" rx="4" fill="#f5f3ff" stroke="#c4b5fd"/>
+<text x="155.0" y="679" font-size="12.5" fill="#4c1d95" font-weight="normal" text-anchor="middle">rgbₖ　面的顏色</text>
+<rect x="294" y="660" width="82" height="28" rx="4" fill="#f5f3ff" stroke="#c4b5fd"/>
+<text x="335.0" y="679" font-size="12.5" fill="#4c1d95" font-weight="normal" text-anchor="middle">clsₖ　種類</text>
+<rect x="384" y="660" width="202" height="28" rx="4" fill="#f5f3ff" stroke="#c4b5fd"/>
+<text x="485.0" y="679" font-size="12.5" fill="#4c1d95" font-weight="normal" text-anchor="middle">Aₖ、Bₖ、Cₖ</text>
+<rect x="594" y="660" width="282" height="28" rx="4" fill="#f5f3ff" stroke="#c4b5fd"/>
+<text x="735.0" y="679" font-size="12.5" fill="#4c1d95" font-weight="normal" text-anchor="middle">Uxₖ Uyₖ U0ₖ　Vxₖ Vyₖ V0ₖ</text>
+<line x1="150" y1="488" x2="150" y2="634" stroke="#374151" stroke-width="1.6" marker-end="url(#a)"/>
+<line x1="330" y1="488" x2="330" y2="634" stroke="#374151" stroke-width="1.6" marker-end="url(#a)"/>
+<line x1="470" y1="608" x2="470" y2="634" stroke="#374151" stroke-width="1.6" marker-end="url(#a)"/>
+<line x1="740" y1="608" x2="740" y2="634" stroke="#374151" stroke-width="1.6" marker-end="url(#a)"/>
+<rect x="8" y="724" width="884" height="690" rx="10" fill="#f0fdf4" stroke="#16a34a" stroke-opacity="0.35"/>
+<text x="20" y="745" font-size="14" fill="#16a34a" font-weight="bold" text-anchor="start" paint-order="stroke" stroke="#f0fdf4" stroke-width="5" stroke-linejoin="round">每個像素：像素管線每拍處理一個像素，所有面同時算（§5.6）</text>
+<rect x="300" y="760" width="300" height="46" rx="6" fill="#ffffff" stroke="#16a34a" stroke-width="1.6"/>
+<text x="310" y="779" font-size="13" fill="#16a34a" font-weight="bold" text-anchor="start">掃描座標 (x, y)</text>
+<text x="310" y="799" font-size="12.5" fill="#1f2937" font-weight="normal" text-anchor="start">來自視訊時序產生器</text>
+<rect x="110" y="830" width="660" height="54" rx="6" fill="#ffffff" stroke="#16a34a" stroke-width="1.6"/>
+<text x="120" y="849" font-size="13" fill="#16a34a" font-weight="bold" text-anchor="start">P1　平移到形體中心</text>
+<text x="120" y="869" font-size="12.5" fill="#1f2937" font-weight="normal" text-anchor="start">dx = x − CX　　dy = y − CY</text>
+<rect x="110" y="906" width="660" height="58" rx="6" fill="#ffffff" stroke="#16a34a" stroke-width="1.6"/>
+<text x="120" y="925" font-size="13" fill="#16a34a" font-weight="bold" text-anchor="start">P2–P3　每個面 k 同時算（每面 2 個 DSP）</text>
+<text x="762" y="924" font-size="11" fill="#6b7280" font-weight="normal" text-anchor="end">§5.1</text>
+<text x="120" y="945" font-size="12.5" fill="#1f2937" font-weight="normal" text-anchor="start">wdₖ = Aₖ + Bₖ·dx + Cₖ·dy　　（正面 / 背面時 wdₖ 就是光線碰到這個面的深度 zₖ）</text>
+<rect x="110" y="986" width="660" height="92" rx="6" fill="#ffffff" stroke="#16a34a" stroke-width="1.6"/>
+<text x="120" y="1005" font-size="13" fill="#16a34a" font-weight="bold" text-anchor="start">P4　依 clsₖ 把 wdₖ 放進對應的位置</text>
+<rect x="124" y="1016" width="200" height="52" rx="5" fill="#f0fdf4" stroke="#86efac"/>
+<text x="224" y="1037" font-size="13" fill="#14532d" font-weight="bold" text-anchor="middle">正面 → 下限</text>
+<text x="224" y="1057" font-size="12.5" fill="#14532d" font-weight="normal" text-anchor="middle">z ≥ wdₖ</text>
+<rect x="338" y="1016" width="200" height="52" rx="5" fill="#f0fdf4" stroke="#86efac"/>
+<text x="438" y="1037" font-size="13" fill="#14532d" font-weight="bold" text-anchor="middle">背面 → 上限</text>
+<text x="438" y="1057" font-size="12.5" fill="#14532d" font-weight="normal" text-anchor="middle">z ≤ wdₖ</text>
+<rect x="552" y="1016" width="200" height="52" rx="5" fill="#f0fdf4" stroke="#86efac"/>
+<text x="652" y="1037" font-size="13" fill="#14532d" font-weight="bold" text-anchor="middle">側面 → 條件</text>
+<text x="652" y="1057" font-size="12.5" fill="#14532d" font-weight="normal" text-anchor="middle">wdₖ ≤ 0 才在內側</text>
+<rect x="110" y="1100" width="660" height="58" rx="6" fill="#ffffff" stroke="#16a34a" stroke-width="1.6"/>
+<text x="120" y="1119" font-size="13" fill="#16a34a" font-weight="bold" text-anchor="start">T1–T5　比較樹（5 層，每層一級）</text>
+<text x="762" y="1118" font-size="11" fill="#6b7280" font-weight="normal" text-anchor="end">§5.1</text>
+<text x="120" y="1139" font-size="12.5" fill="#1f2937" font-weight="normal" text-anchor="start">f = 最大的下限（面 kf）　　b = 最小的上限（面 kb）　　s = 所有側面條件 AND</text>
+<rect x="110" y="1180" width="660" height="76" rx="6" fill="#ffffff" stroke="#16a34a" stroke-width="1.6"/>
+<text x="120" y="1199" font-size="13" fill="#16a34a" font-weight="bold" text-anchor="start">P5　光線有沒有打中？</text>
+<text x="762" y="1198" font-size="11" fill="#6b7280" font-weight="normal" text-anchor="end">§5.1</text>
+<text x="120" y="1219" font-size="12.5" fill="#1f2937" font-weight="normal" text-anchor="start">inside = (f ≤ b) 且 s　　　 下限不超過上限 = 數線上的區間不是空的</text>
+<text x="120" y="1238" font-size="12.5" fill="#1f2937" font-weight="normal" text-anchor="start">看到的面 = kf（進入點）　離開的面 = kb　顏色 = rgb_kf</text>
+<rect x="110" y="1278" width="660" height="58" rx="6" fill="#ffffff" stroke="#16a34a" stroke-width="1.6"/>
+<text x="120" y="1297" font-size="13" fill="#16a34a" font-weight="bold" text-anchor="start">H1–H3　兩個交點的面座標（每個交點 2 × 2 個 DSP）</text>
+<text x="762" y="1296" font-size="11" fill="#6b7280" font-weight="normal" text-anchor="end">§5.7</text>
+<text x="120" y="1317" font-size="12.5" fill="#1f2937" font-weight="normal" text-anchor="start">進入點：u = U0 + Ux·dx + Uy·dy、v 同理，用面 kf 的係數；離開點用面 kb 的係數</text>
+<rect x="110" y="1358" width="660" height="46" rx="6" fill="#ffffff" stroke="#16a34a" stroke-width="1.6"/>
+<text x="120" y="1377" font-size="13" fill="#16a34a" font-weight="bold" text-anchor="start">H4　點雲：(u, v) 所在的 8 × 8 像素格子 → 雜湊 → 這格有沒有點、點在哪</text>
+<text x="762" y="1376" font-size="11" fill="#6b7280" font-weight="normal" text-anchor="end">§5.7</text>
+<line x1="440.0" y1="806" x2="440.0" y2="830" stroke="#374151" stroke-width="1.6" marker-end="url(#a)"/>
+<line x1="440.0" y1="884" x2="440.0" y2="906" stroke="#374151" stroke-width="1.6" marker-end="url(#a)"/>
+<line x1="440.0" y1="964" x2="440.0" y2="986" stroke="#374151" stroke-width="1.6" marker-end="url(#a)"/>
+<line x1="440.0" y1="1078" x2="440.0" y2="1100" stroke="#374151" stroke-width="1.6" marker-end="url(#a)"/>
+<line x1="440.0" y1="1158" x2="440.0" y2="1180" stroke="#374151" stroke-width="1.6" marker-end="url(#a)"/>
+<line x1="440.0" y1="1256" x2="440.0" y2="1278" stroke="#374151" stroke-width="1.6" marker-end="url(#a)"/>
+<line x1="440.0" y1="1336" x2="440.0" y2="1358" stroke="#374151" stroke-width="1.6" marker-end="url(#a)"/>
+<line x1="840" y1="694" x2="840" y2="1307" stroke="#7c3aed" stroke-width="2"/>
+<text x="848" y="760" font-size="13" fill="#7c3aed" font-weight="bold" text-anchor="start">讀</text>
+<text x="848" y="778" font-size="13" fill="#7c3aed" font-weight="bold" text-anchor="start">表</text>
+<line x1="840" y1="935" x2="770" y2="935" stroke="#7c3aed" stroke-width="1.6" marker-end="url(#ag)"/>
+<text x="776" y="930" font-size="11" fill="#7c3aed" font-weight="normal" text-anchor="start">A B C</text>
+<line x1="840" y1="1015" x2="770" y2="1015" stroke="#7c3aed" stroke-width="1.6" marker-end="url(#ag)"/>
+<text x="776" y="1010" font-size="11" fill="#7c3aed" font-weight="normal" text-anchor="start">cls</text>
+<line x1="840" y1="1219" x2="770" y2="1219" stroke="#7c3aed" stroke-width="1.6" marker-end="url(#ag)"/>
+<text x="776" y="1214" font-size="11" fill="#7c3aed" font-weight="normal" text-anchor="start">rgb</text>
+<line x1="840" y1="1307" x2="770" y2="1307" stroke="#7c3aed" stroke-width="1.6" marker-end="url(#ag)"/>
+<text x="776" y="1302" font-size="11" fill="#7c3aed" font-weight="normal" text-anchor="start">U V</text>
+<rect x="8" y="1428" width="884" height="92" rx="10" fill="#fff7ed" stroke="#ea580c" stroke-opacity="0.35"/>
+<text x="20" y="1449" font-size="14" fill="#ea580c" font-weight="bold" text-anchor="start" paint-order="stroke" stroke="#fff7ed" stroke-width="5" stroke-linejoin="round">輸出與合成（HW_3，§6）</text>
+<text x="20" y="1472" font-size="12.5" fill="#1f2937" font-weight="normal" text-anchor="start">每個形體輸出：inside、face = kf、bface = kb、rgb、dot_f、dot_b（比 (x, y) 晚 14 個像素）</text>
+<text x="20" y="1496" font-size="12.5" fill="#1f2937" font-weight="normal" text-anchor="start">→ 三個形體取最上層 → 標籤和左、上兩個像素比較找稜線 → 依樣式（實心 / 全息）選顏色 → RGB → YCbCr 4:2:2 → HDMI</text>
+<line x1="440.0" y1="1404" x2="440.0" y2="1452" stroke="#374151" stroke-width="1.6" marker-end="url(#a)"/>
+</svg>
