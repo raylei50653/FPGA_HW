@@ -1,0 +1,85 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 365" width="760" height="365" font-family="'Noto Sans TC','Microsoft JhengHei','PingFang TC',sans-serif" font-size="13">
+<defs><marker id="ak" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#374151"/></marker></defs>
+<rect width="760" height="365" fill="#ffffff"/>
+<text x="12" y="24" font-weight="bold" font-size="14" fill="#1f2937">一個面上的點雲（面座標 u、v）</text>
+<text x="40" y="50" font-size="12" fill="#6b7280">每格 8 × 8 像素，約 75% 的格子有一個點</text>
+<rect x="40" y="60" width="240" height="200" fill="#eff6ff" stroke="#1f2937" stroke-width="1.5"/>
+<line x1="80" y1="60" x2="80" y2="260" stroke="#93c5fd" stroke-dasharray="3 3"/>
+<line x1="120" y1="60" x2="120" y2="260" stroke="#93c5fd" stroke-dasharray="3 3"/>
+<line x1="160" y1="60" x2="160" y2="260" stroke="#93c5fd" stroke-dasharray="3 3"/>
+<line x1="200" y1="60" x2="200" y2="260" stroke="#93c5fd" stroke-dasharray="3 3"/>
+<line x1="240" y1="60" x2="240" y2="260" stroke="#93c5fd" stroke-dasharray="3 3"/>
+<line x1="40" y1="100" x2="280" y2="100" stroke="#93c5fd" stroke-dasharray="3 3"/>
+<line x1="40" y1="140" x2="280" y2="140" stroke="#93c5fd" stroke-dasharray="3 3"/>
+<line x1="40" y1="180" x2="280" y2="180" stroke="#93c5fd" stroke-dasharray="3 3"/>
+<line x1="40" y1="220" x2="280" y2="220" stroke="#93c5fd" stroke-dasharray="3 3"/>
+<circle cx="56.2" cy="86.2" r="3.2" fill="#2563eb"/>
+<text x="60" y="124" text-anchor="middle" font-size="11" fill="#9ca3af">空</text>
+<circle cx="53.8" cy="163.8" r="3.2" fill="#2563eb"/>
+<circle cx="58.8" cy="191.2" r="3.2" fill="#2563eb"/>
+<circle cx="66.2" cy="233.8" r="3.2" fill="#2563eb"/>
+<circle cx="106.2" cy="71.2" r="3.2" fill="#2563eb"/>
+<text x="100" y="124" text-anchor="middle" font-size="11" fill="#9ca3af">空</text>
+<circle cx="98.8" cy="151.2" r="3.2" fill="#2563eb"/>
+<circle cx="106.2" cy="191.2" r="3.2" fill="#2563eb"/>
+<text x="100" y="244" text-anchor="middle" font-size="11" fill="#9ca3af">空</text>
+<circle cx="136.2" cy="81.2" r="3.2" fill="#2563eb"/>
+<circle cx="133.8" cy="121.2" r="3.2" fill="#2563eb"/>
+<circle cx="136.2" cy="153.8" r="3.2" fill="#2563eb"/>
+<text x="140" y="204" text-anchor="middle" font-size="11" fill="#9ca3af">空</text>
+<circle cx="143.8" cy="233.8" r="3.2" fill="#2563eb"/>
+<circle cx="173.8" cy="71.2" r="3.2" fill="#2563eb"/>
+<circle cx="188.8" cy="126.2" r="3.2" fill="#2563eb"/>
+<text x="180" y="164" text-anchor="middle" font-size="11" fill="#9ca3af">空</text>
+<circle cx="188.8" cy="203.8" r="3.2" fill="#2563eb"/>
+<circle cx="176.2" cy="238.8" r="3.2" fill="#2563eb"/>
+<circle cx="221.2" cy="88.8" r="3.2" fill="#2563eb"/>
+<circle cx="223.8" cy="116.2" r="3.2" fill="#2563eb"/>
+<circle cx="213.8" cy="153.8" r="3.2" fill="#2563eb"/>
+<circle cx="216.2" cy="203.8" r="3.2" fill="#2563eb"/>
+<circle cx="228.8" cy="246.2" r="3.2" fill="#2563eb"/>
+<circle cx="253.8" cy="83.8" r="3.2" fill="#2563eb"/>
+<circle cx="263.8" cy="128.8" r="3.2" fill="#2563eb"/>
+<circle cx="268.8" cy="153.8" r="3.2" fill="#2563eb"/>
+<text x="260" y="204" text-anchor="middle" font-size="11" fill="#9ca3af">空</text>
+<text x="260" y="244" text-anchor="middle" font-size="11" fill="#9ca3af">空</text>
+<rect x="200" y="100" width="40" height="40" fill="none" stroke="#ea580c" stroke-width="2.5"/>
+<line x1="40" y1="276" x2="288" y2="276" stroke="#374151" marker-end="url(#ak)"/>
+<text x="230" y="294" fill="#374151">u（沿 t1）</text>
+<line x1="24" y1="60" x2="24" y2="268" stroke="#374151" marker-end="url(#ak)"/>
+<text x="10" y="294" fill="#374151">v（沿 t2）</text>
+<line x1="240" y1="100" x2="340" y2="60" stroke="#ea580c" stroke-dasharray="4 3"/>
+<line x1="240" y1="140" x2="340" y2="236" stroke="#ea580c" stroke-dasharray="4 3"/>
+<text x="340" y="24" font-weight="bold" font-size="14" fill="#1f2937">放大一格（單位：1/4 像素，一格 = 32）</text>
+<rect x="340" y="60" width="176" height="176" fill="#fff7ed" stroke="#ea580c" stroke-width="2"/>
+<line x1="362.0" y1="60" x2="362.0" y2="236" stroke="#fed7aa"/>
+<line x1="340" y1="82.0" x2="516" y2="82.0" stroke="#fed7aa"/>
+<line x1="384.0" y1="60" x2="384.0" y2="236" stroke="#fed7aa"/>
+<line x1="340" y1="104.0" x2="516" y2="104.0" stroke="#fed7aa"/>
+<line x1="406.0" y1="60" x2="406.0" y2="236" stroke="#fed7aa"/>
+<line x1="340" y1="126.0" x2="516" y2="126.0" stroke="#fed7aa"/>
+<line x1="428.0" y1="60" x2="428.0" y2="236" stroke="#fed7aa"/>
+<line x1="340" y1="148.0" x2="516" y2="148.0" stroke="#fed7aa"/>
+<line x1="450.0" y1="60" x2="450.0" y2="236" stroke="#fed7aa"/>
+<line x1="340" y1="170.0" x2="516" y2="170.0" stroke="#fed7aa"/>
+<line x1="472.0" y1="60" x2="472.0" y2="236" stroke="#fed7aa"/>
+<line x1="340" y1="192.0" x2="516" y2="192.0" stroke="#fed7aa"/>
+<line x1="494.0" y1="60" x2="494.0" y2="236" stroke="#fed7aa"/>
+<line x1="340" y1="214.0" x2="516" y2="214.0" stroke="#fed7aa"/>
+<rect x="389.5" y="109.5" width="77.0" height="77.0" fill="none" stroke="#9a3412" stroke-dasharray="5 3"/>
+<rect x="433.5" y="120.5" width="22.0" height="22.0" fill="#93c5fd" stroke="#2563eb"/>
+<circle cx="444.5" cy="131.5" r="3.5" fill="#2563eb"/>
+<circle cx="428.0" cy="148.0" r="2.5" fill="#9a3412"/>
+<text x="433.0" y="162.0" font-size="11" fill="#9a3412">中心 16</text>
+<text x="337" y="252" font-size="11" fill="#6b7280">0</text><text x="508" y="252" font-size="11" fill="#6b7280">32</text>
+<text x="386.5" y="252" font-size="11" fill="#9a3412">9</text><text x="460.5" y="252" font-size="11" fill="#9a3412">23</text>
+<text x="532" y="74" font-size="12" fill="#9a3412">虛線框：點可能出現的範圍</text>
+<text x="532" y="98" font-size="12" fill="#9a3412">9 ~ 23（9 + 2 × 雜湊的 3 bit）</text>
+<text x="532" y="122" font-size="12" fill="#2563eb">藍點：這一格的點 (pu, pv)</text>
+<text x="532" y="146" font-size="12" fill="#2563eb">淺藍：|wu − pu| ≤ 2 且</text>
+<text x="532" y="170" font-size="12" fill="#2563eb">|wv − pv| ≤ 2 → 點亮</text>
+<text x="532" y="194" font-size="12" fill="#374151">wu、wv：像素在格內的位置</text>
+<text x="532" y="218" font-size="12" fill="#374151">＝ u、v 的第 16 ~ 12 位</text>
+<text x="12" y="331" font-size="12" fill="#1f2937">u、v 是「像素 × 2^14」的定點數，所以：</text>
+<text x="28" y="351" font-size="12" fill="#1f2937">第 24 ~ 17 位 = 格子編號（2^17 = 8 像素）　｜　第 16 ~ 12 位 = 格內位置（2^12 = 1/4 像素）　｜　第 11 ~ 0 位不用</text>
+</svg>

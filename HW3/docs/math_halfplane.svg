@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 300" width="640" height="300" font-family="'Noto Sans TC','Microsoft JhengHei','PingFang TC',sans-serif" font-size="14">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#c2410c"/>
+    </marker>
+    <clipPath id="clip"><rect x="0" y="0" width="372" height="300"/></clipPath>
+  </defs>
+  <rect width="640" height="300" fill="#ffffff"/>
+
+  <!-- 第 0 個面的半平面 n0·p ≤ a（含中心那一側） -->
+  <polygon clip-path="url(#clip)" points="148.4,553.3 422.0,-198.5 -329.8,-472.1 -603.4,279.7" fill="#dbeafe" opacity="0.8"/>
+  <line clip-path="url(#clip)" x1="148.4" y1="553.3" x2="422.0" y2="-198.5" stroke="#2563eb" stroke-width="1.5" stroke-dasharray="6 4"/>
+
+  <!-- 多邊形（正方形，內切圓半徑 a = 80） -->
+  <polygon points="257.8,252.5 107.5,197.8 162.2,47.5 312.5,102.2" fill="#fef3c7" fill-opacity="0.85" stroke="#1f2937" stroke-width="2"/>
+  <line x1="312.5" y1="102.2" x2="257.8" y2="252.5" stroke="#2563eb" stroke-width="3.5"/>
+
+  <!-- 中心到面的距離 a 與法向量 n0 -->
+  <circle cx="210" cy="150" r="3.5" fill="#1f2937"/>
+  <text x="192" y="146" fill="#1f2937">O</text>
+  <line x1="210" y1="150" x2="285.2" y2="177.4" stroke="#1f2937" stroke-width="1.2" stroke-dasharray="4 3"/>
+  <text x="240" y="181" fill="#1f2937" font-style="italic">a</text>
+  <line x1="285.2" y1="177.4" x2="324" y2="191.5" stroke="#c2410c" stroke-width="2.5" marker-end="url(#arr)"/>
+  <text x="328" y="210" fill="#c2410c" font-weight="bold">n₀</text>
+
+  <!-- 兩個測試點 -->
+  <circle cx="190" cy="120" r="5" fill="#16a34a"/>
+  <text x="150" y="112" fill="#16a34a">p₁ 在內</text>
+  <circle cx="335" cy="150" r="5" fill="#dc2626"/>
+  <text x="300" y="140" fill="#dc2626">p₂</text>
+
+  <text x="40" y="282" fill="#2563eb">藍色：第 0 個面的「內側」 n₀·p ≤ a</text>
+
+  <!-- 右側說明 -->
+  <g fill="#1f2937">
+    <text x="390" y="50" font-weight="bold" font-size="15">凸多邊形 = 半平面的交集</text>
+    <text x="390" y="82">每個面 k 把平面切成兩半：</text>
+    <text x="406" y="106">nₖ·p ≤ a　內側（含中心 O）</text>
+    <text x="406" y="130">nₖ·p &gt; a　外側</text>
+    <text x="390" y="162">nₖ：面的單位外法向量</text>
+    <text x="390" y="186">a　：中心到每個面的距離</text>
+    <text x="406" y="206" font-size="12" fill="#6b7280">（正多邊形每個面都一樣）</text>
+    <text x="390" y="238" fill="#16a34a">p₁：4 個不等式都成立 → 在內</text>
+    <text x="390" y="262" fill="#dc2626">p₂：n₀·p₂ &gt; a → 在外</text>
+  </g>
+</svg>

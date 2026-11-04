@@ -1,0 +1,123 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 700 465" width="700" height="465" font-family="'Noto Sans TC','Microsoft JhengHei','PingFang TC',sans-serif" font-size="13">
+  <defs>
+    <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="context-stroke"/>
+    </marker>
+    <marker id="arF" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#ea580c"/></marker>
+    <marker id="arB" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#2563eb"/></marker>
+    <marker id="arK" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#374151"/></marker>
+  </defs>
+  <rect width="700" height="465" fill="#ffffff"/>
+
+  <!-- ===== 上半：側視圖 ===== -->
+  <text x="12" y="20" font-weight="bold" font-size="14" fill="#1f2937">側視圖（固定 dy 的切面）：橫軸 z 往螢幕裡，縱軸 dx</text>
+
+  <!-- 觀眾 -->
+  <circle cx="22" cy="150" r="9" fill="none" stroke="#374151" stroke-width="1.5"/>
+  <circle cx="26" cy="150" r="3" fill="#374151"/>
+  <text x="6" y="178" fill="#374151">觀眾</text>
+
+  <!-- 光線 1（打中） -->
+  <line x1="36" y1="150" x2="640" y2="150" stroke="#9ca3af" stroke-width="1.2" marker-end="url(#arK)"/>
+  <text x="560" y="143" fill="#374151">光線 1</text>
+  <!-- 光線 2（沒打中） -->
+  <line x1="36" y1="40" x2="640" y2="40" stroke="#dc2626" stroke-width="1.2" stroke-dasharray="6 4" marker-end="url(#arK)"/>
+  <text x="560" y="33" fill="#dc2626">光線 2</text>
+
+  <!-- 六邊形：橘色 = 正面（法向量朝觀眾，nz &lt; 0），藍色 = 背面（nz &gt; 0） -->
+  <polygon points="378.1,129.1 357.2,207.2 279.1,228.1 221.9,170.9 242.8,92.8 320.9,71.9" fill="#f3f4f6"/>
+  <g stroke-width="3.5" stroke-linecap="round">
+    <line x1="279.1" y1="228.1" x2="221.9" y2="170.9" stroke="#ea580c"/>
+    <line x1="221.9" y1="170.9" x2="242.8" y2="92.8"  stroke="#ea580c"/>
+    <line x1="242.8" y1="92.8"  x2="320.9" y2="71.9"  stroke="#ea580c"/>
+    <line x1="378.1" y1="129.1" x2="357.2" y2="207.2" stroke="#2563eb"/>
+    <line x1="357.2" y1="207.2" x2="279.1" y2="228.1" stroke="#2563eb"/>
+    <line x1="320.9" y1="71.9"  x2="378.1" y2="129.1" stroke="#2563eb"/>
+  </g>
+  <!-- 面的名字 -->
+  <g font-weight="bold">
+    <text x="222" y="226" fill="#ea580c">F1</text>
+    <text x="180" y="112" fill="#ea580c">F2</text>
+    <text x="262" y="70"  fill="#ea580c">F3</text>
+    <text x="388" y="178" fill="#2563eb">B1</text>
+    <text x="314" y="250" fill="#2563eb">B2</text>
+    <text x="366" y="88"  fill="#2563eb">B3</text>
+  </g>
+  <!-- 法向量（示意兩個） -->
+  <line x1="232.35" y1="131.85" x2="203" y2="124" stroke="#ea580c" stroke-width="1.5" marker-end="url(#arF)"/>
+  <line x1="367.65" y1="168.15" x2="384" y2="172.5" stroke="#2563eb" stroke-width="1.5" marker-end="url(#arB)"/>
+
+  <!-- 光線 1 在形體內的一段 -->
+  <line x1="227.5" y1="150" x2="372.5" y2="150" stroke="#16a34a" stroke-width="5"/>
+  <circle cx="227.5" cy="150" r="5" fill="#ea580c"/>
+  <circle cx="372.5" cy="150" r="5" fill="#2563eb"/>
+  <text x="150" y="168" fill="#ea580c">進入點</text>
+  <text x="392" y="146" fill="#2563eb">離開點</text>
+
+  <!-- 圖例 -->
+  <g font-size="12">
+    <line x1="440" y1="200" x2="464" y2="200" stroke="#ea580c" stroke-width="3.5"/>
+    <text x="470" y="204" fill="#1f2937">正面 F：nz &lt; 0，給 z ≥ zₖ（下限）</text>
+    <line x1="440" y1="222" x2="464" y2="222" stroke="#2563eb" stroke-width="3.5"/>
+    <text x="470" y="226" fill="#1f2937">背面 B：nz &gt; 0，給 z ≤ zₖ（上限）</text>
+    <line x1="440" y1="244" x2="464" y2="244" stroke="#16a34a" stroke-width="5"/>
+    <text x="470" y="248" fill="#1f2937">光線在形體內的一段</text>
+  </g>
+
+  <!-- ===== 下半：每條光線的 z 數線 ===== -->
+  <line x1="0" y1="272" x2="700" y2="272" stroke="#e5e7eb"/>
+  <text x="12" y="294" font-weight="bold" font-size="14" fill="#1f2937">把每個面的 zₖ 畫在 z 數線上（同一個橫軸）</text>
+
+  <!-- 數線 1 -->
+  <g transform="translate(0,345)">
+    <line x1="10" y1="0" x2="645" y2="0" stroke="#374151" stroke-width="1.2" marker-end="url(#arK)"/>
+    <text x="630" y="-8" fill="#374151">z</text>
+    <line x1="227.5" y1="0" x2="372.5" y2="0" stroke="#16a34a" stroke-width="7"/>
+    <!-- 正面：下限，箭頭朝右 -->
+    <g stroke="#ea580c" stroke-width="2">
+      <line x1="29.7" y1="-9" x2="29.7" y2="9"/><line x1="29.7" y1="-9" x2="48" y2="-9" marker-end="url(#arF)"/>
+      <line x1="201" y1="-9" x2="201" y2="9"/><line x1="201" y1="-9" x2="219" y2="-9" marker-end="url(#arF)"/>
+      <line x1="227.5" y1="-9" x2="227.5" y2="9"/><line x1="227.5" y1="-9" x2="246" y2="-9" marker-end="url(#arF)"/>
+    </g>
+    <!-- 背面：上限，箭頭朝左 -->
+    <g stroke="#2563eb" stroke-width="2">
+      <line x1="372.5" y1="-9" x2="372.5" y2="9"/><line x1="372.5" y1="-9" x2="354" y2="-9" marker-end="url(#arB)"/>
+      <line x1="399" y1="-9" x2="399" y2="9"/><line x1="399" y1="-9" x2="381" y2="-9" marker-end="url(#arB)"/>
+      <line x1="570.3" y1="-9" x2="570.3" y2="9"/><line x1="570.3" y1="-9" x2="552" y2="-9" marker-end="url(#arB)"/>
+    </g>
+    <g font-size="12" font-weight="bold">
+      <text x="22" y="24" fill="#ea580c">F3</text>
+      <text x="186" y="24" fill="#ea580c">F1</text>
+      <text x="222" y="24" fill="#ea580c">F2</text>
+      <text x="360" y="24" fill="#2563eb">B1</text>
+      <text x="394" y="24" fill="#2563eb">B3</text>
+      <text x="563" y="24" fill="#2563eb">B2</text>
+    </g>
+    <text x="12" y="-24" fill="#16a34a" font-size="12">光線 1：max(正面) = F2 ≤ min(背面) = B1 → 打中，從 F2 進入、B1 離開</text>
+  </g>
+
+  <!-- 數線 2 -->
+  <g transform="translate(0,430)">
+    <line x1="10" y1="0" x2="645" y2="0" stroke="#374151" stroke-width="1.2" marker-end="url(#arK)"/>
+    <text x="630" y="-8" fill="#374151">z</text>
+    <line x1="289" y1="0" x2="440.2" y2="0" stroke="#dc2626" stroke-width="7" stroke-dasharray="5 3"/>
+    <g stroke="#ea580c" stroke-width="2">
+      <line x1="91" y1="-9" x2="91" y2="9"/><line x1="91" y1="-9" x2="109" y2="-9" marker-end="url(#arF)"/>
+      <line x1="257" y1="-9" x2="257" y2="9"/><line x1="257" y1="-9" x2="275" y2="-9" marker-end="url(#arF)"/>
+      <line x1="440.2" y1="-9" x2="440.2" y2="9"/><line x1="440.2" y1="-9" x2="458" y2="-9" marker-end="url(#arF)"/>
+    </g>
+    <g stroke="#2563eb" stroke-width="2">
+      <line x1="289" y1="-9" x2="289" y2="9"/><line x1="289" y1="-9" x2="271" y2="-9" marker-end="url(#arB)"/>
+      <line x1="401.9" y1="-9" x2="401.9" y2="9"/><line x1="401.9" y1="-9" x2="384" y2="-9" marker-end="url(#arB)"/>
+    </g>
+    <g font-size="12" font-weight="bold">
+      <text x="84" y="24" fill="#ea580c">F1</text>
+      <text x="250" y="24" fill="#ea580c">F2</text>
+      <text x="434" y="24" fill="#ea580c">F3</text>
+      <text x="282" y="24" fill="#2563eb">B3</text>
+      <text x="395" y="24" fill="#2563eb">B1</text>
+      <text x="560" y="24" fill="#2563eb" font-weight="normal">B2 在更右邊</text>
+    </g>
+    <text x="12" y="-24" fill="#dc2626" font-size="12">光線 2：max(正面) = F3 &gt; min(背面) = B3 → 下限比上限大，區間是空的，沒打中</text>
+  </g>
+</svg>
