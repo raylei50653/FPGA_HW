@@ -28,16 +28,16 @@
 |---|---|---|---|---|
 | ① 1 ms 節拍 | 由 `clk` 除頻出 1 ms 單拍致能 | `HW_4.vhd` | `tick_cnt`、`tick_1ms` | §7.1 |
 | ② 按鈕介面 ×2、SW0 同步 | 同步、去彈跳、按下瞬間的單拍脈衝；SW0 兩級同步 | `HW_4_btn.vhd`、`HW_4.vhd` | `press_l`、`press_r`、`sw_speed_s` | §8 |
-| 事件訊號 | 組合邏輯：把判定規則寫成一個個單拍事件 | `HW_4.vhd` | `serve_go`、`early`、`set_pending`、`hit_go`、`miss`、`lose`、`show_done`、`win`、`restart` | §4.3、§5 |
 | ③ 遊戲 FSM | 只負責切換狀態、記錄發球方與 POINT 顯示時間 | `HW_4.vhd` | `state`、`server`、`wait_cnt` | §5 |
-| ④ 球 | 發球、反向、加速、每 ms 推進 | `HW_4.vhd` | `pos`、`to_left`、`step_ms`、`step_cnt`、`t_rel`、`hit_pending` | §4、§7.2 |
+| ④ 球 | 發球、回擊判定、加速、每 ms 推進；輸了送出 `lose` | `HW_4.vhd` | `pos`、`to_left`、`step_ms`、`step_cnt`、`t_rel`、`hit_pending`、`lose` | §4、§5、§7.2 |
 | ④ 計分 | 接球方輸時對方加 1 分；重新開局歸零 | `HW_4.vhd` | `score_l`、`score_r` | §4.5 |
 | ⑤ 1 Hz 閃爍 | 每 500 ms 翻轉一次，進入 POINT / OVER 時從「亮」開始 | `HW_4.vhd` | `blink_cnt`、`blink_on` | §6.2 |
 | ⑥ LED 輸出選擇 | 依狀態輸出球（one-hot）或分數長條，經暫存器輸出 | `HW_4.vhd` | `led_reg` | §6 |
 
 全部 process 由 `clk` 驅動，時序控制一律使用單拍致能脈衝（`tick_1ms`、`press_l`、`press_r`），
-不產生衍生時脈。程式只用基本寫法：沒有 function，process 內沒有 variable，每個 process 只管一組暫存器；
-各 process 之間靠上面的事件訊號溝通。
+不產生衍生時脈。程式只用基本寫法：沒有 function，process 內沒有 variable，每個 process 只管一組暫存器。
+回擊判定全部寫在 ④ 球的 process 裡；③ FSM 與 ④ 計分只看它送出的單拍 `lose`（接球方輸了）。
+組合邏輯只有兩個按鍵選擇：`press_rx`（接球方的按鍵）、`press_srv`（發球方的按鍵）。
 
 ## 3. 介面
 
@@ -158,18 +158,22 @@ Elaboration 時以 `assert` 檢查：
 | `POINT` | 得分方長條，1 Hz 閃 | 無（按鈕忽略） | `wait_cnt` 滿 `SCORE_SHOW_MS` → `OVER` 或 `SERVE` |
 | `OVER` | 勝方長條，1 Hz 閃 | 任一按鈕 | 按下 → `SERVE`，比分歸零 |
 
-`PLAY` 中的判定寫成組合邏輯的事件訊號（`press_rx` = 接球方的按鍵）：
+`PLAY` 中的判定寫在 ④ 球的 process，`press_rx` 為接球方的按鍵，每個 clk 依序檢查：
 
-| 事件 | 條件 | 結果 |
-|---|---|---|
-| `early` | `press_rx` 且 `hit_pending = '0'` 且 `t_rel < −HIT_EARLY_MS` | 接球方輸 → `POINT` |
-| `set_pending` | `press_rx` 且 `hit_pending = '0'` 且 `−HIT_EARLY_MS ≤ t_rel < 0` | 記下 `hit_pending` |
-| `hit_go` | `t_rel ≥ 0` 且（`press_rx` 或 `hit_pending = '1'`） | 反向（早接在抵達的下一拍生效） |
-| `miss` | `tick_1ms` 且 `t_rel = HIT_LATE_MS` 且沒有 `hit_go` | 接球方輸 → `POINT` |
-| 推進 | `tick_1ms` 且沒有 `lose`（= `early` 或 `miss`） | `t_rel` 加 1，必要時移動 `pos`（§7.2） |
+```text
+if press_rx 且 −HIT_EARLY_MS ≤ t_rel < 0      → hit_pending ← 1（另外獨立判斷，可與「推進」同一拍）
 
-`early`、`set_pending`、`hit_go` 的 `t_rel` 範圍互不重疊，`miss` 又排除了 `hit_go`，所以同一拍最多
-只會發生一件事（`set_pending` 可以和「推進」同一拍）。
+if   press_rx 且 t_rel < −HIT_EARLY_MS            → 早按：lose ← 1
+elsif (press_rx 或 hit_pending) 且 t_rel ≥ 0     → 回擊：反向（早接在抵達的下一拍生效）
+elsif tick_1ms：
+     if t_rel = HIT_LATE_MS                      → 出界：lose ← 1
+     else                                        → 推進：t_rel + 1，必要時移動 pos（§7.2）
+```
+
+- `lose` 是暫存器輸出的單拍脈衝，③ FSM 與 ④ 計分在下一個 clk 才看到，所以得分比判定晚 1 clk（10 ns）。
+  這一拍 `state` 仍是 `PLAY`，④ 球以 `lose = '0'` 為條件，不會再判定或推進。
+- `SERVE`、`POINT`、`OVER` 中 ④ 球把 `pos` 放到 `server` 那一端：`POINT` / `OVER` 時 `server` 已是
+  得分方 / 勝方，也就是下一個發球方，所以回到 `SERVE` 的第一拍球就在正確位置。
 
 ## 6. LED 顯示
 
@@ -322,7 +326,7 @@ LED 輸出為 reset 後第一拍的 SERVE 畫面（LD7 亮）。按鈕介面的 
 
 按鈕、開關與 LED 對時脈非同步，不做 I/O 時序分析（`set_false_path`）。
 
-實作結果（Vivado 2018.3）：205 LUT、142 FF，100 MHz 下 WNS ≈ +3.1 ns，沒有 latch。
+實作結果（Vivado 2018.3）：223 LUT、143 FF，100 MHz 下 WNS ≈ +3.0 ns，沒有 latch。
 
 ## 12. 待確認
 

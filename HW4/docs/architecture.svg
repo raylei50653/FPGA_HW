@@ -60,8 +60,8 @@
   <line class="sep" x1="390" y1="192" x2="520" y2="192"/>
   <text class="m" x="455" y="218">server 發球方</text>
   <text class="m" x="455" y="242">wait_cnt 顯示計時</text>
-  <text class="s" x="455" y="276">事件：early、hit_go、</text>
-  <text class="s" x="455" y="296">miss、serve_go…</text>
+  <text class="s" x="455" y="276">看 ④ 球送出的</text>
+  <text class="m" x="455" y="296">lose</text>
 
   <!-- 第四欄：暫存器與輸出 -->
   <rect class="reg" x="580" y="40" width="160" height="56" rx="6"/>

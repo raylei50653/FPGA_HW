@@ -238,6 +238,7 @@ begin
         report "T7 early press loses; score bar blinks at 1 Hz; ball speed resets";
         hit_at(false, -EARLY - 1);
         t0 := now - 1 ns;
+        clocks(1);                                       -- lose 是暫存器輸出，計分晚 1 clk
         check(score_l = 1 and score_r = 0, "early press: left should score");
         check(server = '1', "scorer (left) should serve next");
         btn_r <= '0';
@@ -260,7 +261,8 @@ begin
         wait until pos = 0;
         t0 := now;
         wait until score_l = 2;
-        check(now - t0 = (LATE + 1) * MS, "miss should be scored at the tick where t_rel = HIT_LATE_MS");
+        -- t_rel = HIT_LATE_MS 那個 tick 判出界（第 LATE + 1 個 tick），lose 再晚 1 clk 計分
+        check(now - t0 = (LATE + 1) * MS + CLK_PERIOD, "miss should be scored at the tick where t_rel = HIT_LATE_MS");
         t0 := now;
         clocks(2);
         check(led_a = "11000000", "POINT: left bar of 2");
@@ -289,6 +291,7 @@ begin
         check(t_rel = saved, "BTNL must not serve when right is the server");
         push(false);                                     -- 右發球，球往左
         hit_at(true, -30);                               -- 判定窗外按下並一直按住
+        clocks(1);
         check(score_r = 2, "early press while holding: right scores");
         wait for 60 * MS;                                -- 一直按住
         check(score_r = 2 and score_l = 2, "holding must not trigger again");

@@ -8,9 +8,8 @@ use IEEE.STD_LOGIC_1164.ALL;
 --
 --   ① 1 ms 節拍     tick_1ms
 --   ② 按鈕與開關     press_l、press_r（HW_4_btn），sw_speed_s
---      事件訊號       serve_go、early、hit_go、miss、lose…（組合邏輯，由 ③ ④ 使用）
 --   ③ 遊戲 FSM      state、server、wait_cnt
---   ④ 球            pos、to_left、step_ms、step_cnt、t_rel、hit_pending
+--   ④ 球            pos、to_left、step_ms、step_cnt、t_rel、hit_pending；判定結果 lose
 --   ④ 計分          score_l、score_r
 --   ⑤ 1 Hz 閃爍     blink_cnt、blink_on
 --   ⑥ LED 輸出      led_reg
@@ -63,6 +62,8 @@ architecture Behavioral of HW_4 is
     -- ② 按鈕與開關
     signal press_l    : std_logic;
     signal press_r    : std_logic;
+    signal press_rx   : std_logic;          -- 接球方的按鍵（球往哪邊就是哪邊）
+    signal press_srv  : std_logic;          -- 發球方的按鍵
     signal sw_s1      : std_logic := '0';
     signal sw_speed_s : std_logic := '0';
 
@@ -79,6 +80,7 @@ architecture Behavioral of HW_4 is
     signal step_cnt    : integer range 0 to STEP_MS_INIT - 1 := 0;
     signal t_rel       : integer range -TRAVEL * STEP_MS_INIT to HIT_LATE_MS := 0;  -- 距離球抵達邊界的 ms
     signal hit_pending : std_logic := '0';  -- 判定窗內提早按下，等球抵達邊界再反向
+    signal lose        : std_logic := '0';  -- 接球方輸了（早按或出界），單拍
 
     -- ④ 計分
     signal score_l : integer range 0 to WIN_SCORE := 0;
@@ -90,19 +92,6 @@ architecture Behavioral of HW_4 is
 
     -- ⑥ LED 輸出（內部一律高電位 = 亮）
     signal led_reg : std_logic_vector(7 downto 0) := "10000000";
-
-    -- 事件訊號：每個都只維持一個 clk
-    signal press_rx    : std_logic;   -- 接球方的按鍵
-    signal serve_go    : std_logic;   -- SERVE：發球方按下
-    signal early       : std_logic;   -- PLAY：判定窗前就按 → 接球方輸
-    signal set_pending : std_logic;   -- PLAY：判定窗內、球還沒到邊界 → 先記下
-    signal hit_go      : std_logic;   -- PLAY：有效回擊 → 反向
-    signal miss        : std_logic;   -- PLAY：判定窗結束還沒按 → 接球方輸
-    signal lose        : std_logic;   -- early 或 miss
-    signal show_done   : std_logic;   -- POINT：顯示時間到
-    signal win         : std_logic;   -- 得分方已達勝分
-    signal restart     : std_logic;   -- OVER：任一鍵重新開局
-    signal step_next   : integer range STEP_MS_MIN to STEP_MS_INIT;   -- 回擊後的球速
 
 begin
 
@@ -123,16 +112,14 @@ begin
     process(clk)
     begin
         if rising_edge(clk) then
-            if reset = '1' or tick_cnt = TICK_DIV - 1 then
+            tick_1ms <= '0';
+            if reset = '1' then
                 tick_cnt <= 0;
-            else
-                tick_cnt <= tick_cnt + 1;
-            end if;
-
-            if reset = '0' and tick_cnt = TICK_DIV - 1 then
+            elsif tick_cnt = TICK_DIV - 1 then
+                tick_cnt <= 0;
                 tick_1ms <= '1';
             else
-                tick_1ms <= '0';
+                tick_cnt <= tick_cnt + 1;
             end if;
         end if;
     end process;
@@ -148,6 +135,9 @@ begin
         generic map (DEBOUNCE_CYCLES => DEBOUNCE_CYCLES, ACTIVE_LOW => BTN_ACTIVE_LOW)
         port map (clk => clk, reset => reset, btn_in => btn_r, press => press_r);
 
+    press_rx  <= press_l when to_left = '1' else press_r;
+    press_srv <= press_l when server  = '1' else press_r;
+
     process(clk)
     begin
         if rising_edge(clk) then
@@ -155,45 +145,6 @@ begin
             sw_speed_s <= sw_s1;
         end if;
     end process;
-
-    --------------------------------------------------
-    -- 事件訊號（判定規則見 SPEC §4.3）
-    --   t_rel < 0：球還沒到邊界；t_rel = 0：剛到；t_rel > 0：停在邊界等待
-    --------------------------------------------------
-    press_rx <= press_l when to_left = '1' else press_r;
-
-    serve_go <= '1' when state = S_SERVE and
-                         ((server = '1' and press_l = '1') or (server = '0' and press_r = '1'))
-                else '0';
-
-    early <= '1' when state = S_PLAY and press_rx = '1' and hit_pending = '0'
-                      and t_rel < -HIT_EARLY_MS
-             else '0';
-
-    set_pending <= '1' when state = S_PLAY and press_rx = '1' and hit_pending = '0'
-                            and t_rel >= -HIT_EARLY_MS and t_rel < 0
-                   else '0';
-
-    hit_go <= '1' when state = S_PLAY and t_rel >= 0 and (press_rx = '1' or hit_pending = '1')
-              else '0';
-
-    miss <= '1' when state = S_PLAY and tick_1ms = '1' and t_rel = HIT_LATE_MS and hit_go = '0'
-            else '0';
-
-    lose <= early or miss;
-
-    show_done <= '1' when state = S_POINT and tick_1ms = '1' and wait_cnt = SCORE_SHOW_MS - 1
-                 else '0';
-
-    win <= '1' when (server = '1' and score_l = WIN_SCORE) or (server = '0' and score_r = WIN_SCORE)
-           else '0';
-
-    restart <= '1' when state = S_OVER and (press_l = '1' or press_r = '1') else '0';
-
-    -- SW0 撥上時每次回擊快 STEP_MS_DEC，最快 STEP_MS_MIN
-    step_next <= step_ms     when sw_speed_s = '0' else
-                 STEP_MS_MIN when step_ms - STEP_MS_DEC <= STEP_MS_MIN else
-                 step_ms - STEP_MS_DEC;
 
     --------------------------------------------------
     -- ③ 遊戲 FSM：只負責切換狀態，記錄發球方與 POINT 顯示時間
@@ -208,7 +159,7 @@ begin
             else
                 case state is
                     when S_SERVE =>
-                        if serve_go = '1' then
+                        if press_srv = '1' then
                             state <= S_PLAY;
                         end if;
 
@@ -220,18 +171,21 @@ begin
                         end if;
 
                     when S_POINT =>
-                        if show_done = '1' then
-                            if win = '1' then
-                                state <= S_OVER;
+                        if tick_1ms = '1' then
+                            if wait_cnt = SCORE_SHOW_MS - 1 then
+                                if (server = '1' and score_l = WIN_SCORE) or
+                                   (server = '0' and score_r = WIN_SCORE) then
+                                    state <= S_OVER;
+                                else
+                                    state <= S_SERVE;
+                                end if;
                             else
-                                state <= S_SERVE;
+                                wait_cnt <= wait_cnt + 1;
                             end if;
-                        elsif tick_1ms = '1' then
-                            wait_cnt <= wait_cnt + 1;
                         end if;
 
                     when S_OVER =>
-                        if restart = '1' then
+                        if press_l = '1' or press_r = '1' then
                             state <= S_SERVE;           -- server 不變：上一局勝方先發
                         end if;
                 end case;
@@ -240,13 +194,20 @@ begin
     end process;
 
     --------------------------------------------------
-    -- ④ 球：發球、反向、每 ms 推進
+    -- ④ 球：發球、回擊判定、每 ms 推進
     --   發出一趟時 t_rel = −7 × step_ms，之後每 ms 加 1；
-    --   pos 由同一個 tick 每 step_ms 移一格，所以球到邊界時 t_rel 剛好是 0
+    --   pos 由同一個 tick 每 step_ms 移一格，所以球到邊界時 t_rel 剛好是 0。
+    --   判定（SPEC §4.3）：
+    --     t_rel < −HIT_EARLY_MS 時按      → 早按，lose
+    --     −HIT_EARLY_MS ≤ t_rel < 0 時按  → 記下 hit_pending，球到邊界再反向
+    --     t_rel ≥ 0 時按（或已記下）       → 反向
+    --     t_rel 到 HIT_LATE_MS 還沒反向    → 出界，lose
     --------------------------------------------------
     process(clk)
     begin
         if rising_edge(clk) then
+            lose <= '0';
+
             if reset = '1' then
                 pos         <= EDGE_L;
                 to_left     <= '0';
@@ -254,62 +215,81 @@ begin
                 step_cnt    <= 0;
                 t_rel       <= 0;
                 hit_pending <= '0';
-            else
-                if serve_go = '1' then
-                    -- 發球：往對方、回到初始球速
+
+            elsif state /= S_PLAY then
+                -- SERVE / POINT / OVER：球放在下一個發球方的邊界
+                -- （POINT、OVER 中 server 已經是得分方 / 勝方，也就是下一個發球方）
+                if server = '1' then
+                    pos <= EDGE_L;
+                else
+                    pos <= EDGE_R;
+                end if;
+                -- 發球方按下就往對方發出，回到初始球速
+                if state = S_SERVE and press_srv = '1' then
                     to_left     <= not server;
                     step_ms     <= STEP_MS_INIT;
                     step_cnt    <= 0;
                     t_rel       <= -TRAVEL * STEP_MS_INIT;
                     hit_pending <= '0';
-
-                elsif hit_go = '1' then
-                    -- 回擊：反向，可能加速
-                    to_left     <= not to_left;
-                    step_ms     <= step_next;
-                    step_cnt    <= 0;
-                    t_rel       <= -TRAVEL * step_next;
-                    hit_pending <= '0';
-
-                elsif show_done = '1' or restart = '1' then
-                    -- 準備發球：球放到發球方邊界
-                    if server = '1' then
-                        pos <= EDGE_L;
-                    else
-                        pos <= EDGE_R;
-                    end if;
-
-                elsif state = S_PLAY and tick_1ms = '1' and lose = '0' then
-                    -- 推進：t_rel 加 1；球還沒到邊界時每 step_ms 移一格
-                    t_rel <= t_rel + 1;
-                    if (to_left = '1' and pos /= EDGE_L) or (to_left = '0' and pos /= EDGE_R) then
-                        if step_cnt = step_ms - 1 then
-                            step_cnt <= 0;
-                            if to_left = '1' then
-                                pos <= pos + 1;
-                            else
-                                pos <= pos - 1;
-                            end if;
-                        else
-                            step_cnt <= step_cnt + 1;
-                        end if;
-                    end if;
                 end if;
 
-                if set_pending = '1' then
+            elsif state = S_PLAY and lose = '0' then
+                -- 判定窗內、球還沒到邊界就按：先記下
+                if press_rx = '1' and t_rel >= -HIT_EARLY_MS and t_rel < 0 then
                     hit_pending <= '1';
+                end if;
+
+                if press_rx = '1' and t_rel < -HIT_EARLY_MS then
+                    -- 早按：接球方輸
+                    lose <= '1';
+
+                elsif (press_rx = '1' or hit_pending = '1') and t_rel >= 0 then
+                    -- 回擊：反向；SW0 撥上時加速，最快 STEP_MS_MIN
+                    to_left     <= not to_left;
+                    step_cnt    <= 0;
+                    hit_pending <= '0';
+                    if sw_speed_s = '1' and step_ms - STEP_MS_DEC > STEP_MS_MIN then
+                        step_ms <= step_ms - STEP_MS_DEC;
+                        t_rel   <= -TRAVEL * (step_ms - STEP_MS_DEC);
+                    elsif sw_speed_s = '1' then
+                        step_ms <= STEP_MS_MIN;
+                        t_rel   <= -TRAVEL * STEP_MS_MIN;
+                    else
+                        t_rel   <= -TRAVEL * step_ms;
+                    end if;
+
+                elsif tick_1ms = '1' then
+                    if t_rel = HIT_LATE_MS then
+                        -- 出界：接球方輸
+                        lose <= '1';
+                    else
+                        -- 推進：t_rel 加 1；球還沒到邊界時每 step_ms 移一格
+                        t_rel <= t_rel + 1;
+                        if (to_left = '1' and pos /= EDGE_L) or (to_left = '0' and pos /= EDGE_R) then
+                            if step_cnt = step_ms - 1 then
+                                step_cnt <= 0;
+                                if to_left = '1' then
+                                    pos <= pos + 1;
+                                else
+                                    pos <= pos - 1;
+                                end if;
+                            else
+                                step_cnt <= step_cnt + 1;
+                            end if;
+                        end if;
+                    end if;
                 end if;
             end if;
         end if;
     end process;
 
     --------------------------------------------------
-    -- ④ 計分：接球方輸時對方加 1 分；重新開局歸零
+    -- ④ 計分：接球方輸時對方加 1 分；OVER 中按任一鍵歸零
     --------------------------------------------------
     process(clk)
     begin
         if rising_edge(clk) then
-            if reset = '1' or restart = '1' then
+            if reset = '1' or (state = S_OVER and (press_l = '1' or press_r = '1')) then
                 score_l <= 0;
                 score_r <= 0;
             elsif lose = '1' then
