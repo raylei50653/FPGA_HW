@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 680 268" width="680" height="268" role="img" aria-label="HW4 遊戲狀態機：SERVE 按發球鍵進入 PLAY；PLAY 接到球反向，漏接或早按進入 POINT；POINT 閃 2 s 後未達勝分回 SERVE 由得分方發球，達勝分進入 OVER；OVER 按任一鍵比分歸零、勝方發球">
+  <style>
+    .st { fill: #fbefff; stroke: #8250df; stroke-width: 1.2; }
+    .ov { fill: #fff1e5; stroke: #bc4c00; stroke-width: 1.2; }
+    .t { font: 600 14px "Noto Sans TC", "Microsoft JhengHei", "PingFang TC", sans-serif; fill: #1f2328; text-anchor: middle; dominant-baseline: central; }
+    .s { font: 12px "Noto Sans TC", "Microsoft JhengHei", "PingFang TC", sans-serif; fill: #59636e; text-anchor: middle; dominant-baseline: central; }
+    .l { font: 12px "Noto Sans TC", "Microsoft JhengHei", "PingFang TC", sans-serif; fill: #59636e; dominant-baseline: central; }
+    .e { fill: none; stroke: #59636e; stroke-width: 1.4; }
+    .ah { fill: #59636e; }
+    @media (prefers-color-scheme: dark) {
+      .st { fill: #271052; stroke: #ab7df8; }
+      .ov { fill: #3d1d00; stroke: #db6d28; }
+      .t { fill: #e6edf3; }
+      .s, .l { fill: #9198a1; }
+      .e { stroke: #9198a1; }
+      .ah { fill: #9198a1; }
+    }
+  </style>
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path class="ah" d="M0,0 L10,5 L0,10 z"/>
+    </marker>
+  </defs>
+
+  <rect class="st" x="60" y="60" width="140" height="56" rx="6"/>
+  <text class="t" x="130" y="78">發球 SERVE</text><text class="s" x="130" y="99">球停在發球方邊界</text>
+  <rect class="st" x="270" y="60" width="140" height="56" rx="6"/>
+  <text class="t" x="340" y="78">對打 PLAY</text><text class="s" x="340" y="99">每 step 移一格</text>
+  <rect class="st" x="480" y="60" width="150" height="56" rx="6"/>
+  <text class="t" x="555" y="78">得分 POINT</text><text class="s" x="555" y="99">得分方長條 1 Hz 閃</text>
+  <rect class="ov" x="480" y="200" width="150" height="56" rx="6"/>
+  <text class="t" x="555" y="218">結束 OVER</text><text class="s" x="555" y="239">勝方長條 1 Hz 閃</text>
+
+  <line class="e" x1="200" y1="88" x2="268" y2="88" marker-end="url(#a)"/>
+  <text class="s" x="234" y="74">發球鍵</text>
+  <line class="e" x1="410" y1="88" x2="478" y2="88" marker-end="url(#a)"/>
+  <text class="s" x="444" y="74">漏接/早按</text>
+  <path class="e" d="M315,116 C315,158 365,158 365,118" marker-end="url(#a)"/>
+  <text class="s" x="340" y="172">判定窗內按下：反向、加速</text>
+  <path class="e" d="M555,60 L555,32 L130,32 L130,58" marker-end="url(#a)"/>
+  <text class="s" x="340" y="20">閃 2 s 後、未達勝分：得分方發球</text>
+  <line class="e" x1="555" y1="116" x2="555" y2="198" marker-end="url(#a)"/>
+  <text class="l" x="565" y="158">達勝分</text>
+  <path class="e" d="M480,228 L130,228 L130,118" marker-end="url(#a)"/>
+  <text class="s" x="300" y="246">任一鍵：比分歸零，上局勝方發球</text>
+</svg>

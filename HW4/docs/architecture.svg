@@ -1,0 +1,93 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 770 436" width="770" height="436" role="img" aria-label="HW4 LED 乒乓球架構圖：按鈕與 SW0 → 去彈跳與同步 → 遊戲 FSM → 球與計分暫存器 → LED 輸出選擇 → 8 顆 LED">
+  <style>
+    .box { fill: #f6f8fa; stroke: #8c959f; stroke-width: 1.2; }
+    .fsm { fill: #fbefff; stroke: #8250df; stroke-width: 1.2; }
+    .reg { fill: #dafbe1; stroke: #1a7f37; stroke-width: 1.2; }
+    .out { fill: #fff1e5; stroke: #bc4c00; stroke-width: 1.2; }
+    .sep { stroke: #c297ff; stroke-width: 1; stroke-dasharray: 4 3; }
+    .t { font: 600 14px "Noto Sans TC", "Microsoft JhengHei", "PingFang TC", sans-serif; fill: #1f2328; text-anchor: middle; }
+    .s { font: 12px "Noto Sans TC", "Microsoft JhengHei", "PingFang TC", sans-serif; fill: #59636e; text-anchor: middle; }
+    .m { font: 12px ui-monospace, "Cascadia Code", Consolas, monospace; fill: #59636e; text-anchor: middle; }
+    .e { fill: none; stroke: #59636e; stroke-width: 1.4; }
+    .ah { fill: #59636e; }
+    @media (prefers-color-scheme: dark) {
+      .box { fill: #161b22; stroke: #3d444d; }
+      .fsm { fill: #271052; stroke: #ab7df8; }
+      .reg { fill: #04260f; stroke: #3fb950; }
+      .out { fill: #3d1d00; stroke: #db6d28; }
+      .sep { stroke: #8957e5; }
+      .t { fill: #e6edf3; }
+      .s, .m { fill: #9198a1; }
+      .e { stroke: #9198a1; }
+      .ah { fill: #9198a1; }
+    }
+  </style>
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path class="ah" d="M0,0 L10,5 L0,10 z"/>
+    </marker>
+  </defs>
+
+  <!-- 第一欄：板上輸入 -->
+  <rect class="box" x="20" y="40" width="120" height="56" rx="6"/>
+  <text class="t" x="80" y="64">BTNL</text><text class="s" x="80" y="84">左玩家</text>
+  <rect class="box" x="20" y="120" width="120" height="56" rx="6"/>
+  <text class="t" x="80" y="144">BTNR</text><text class="s" x="80" y="164">右玩家</text>
+  <rect class="box" x="20" y="200" width="120" height="56" rx="6"/>
+  <text class="t" x="80" y="224">SW0</text><text class="s" x="80" y="244">加速開關</text>
+  <rect class="box" x="20" y="280" width="120" height="56" rx="6"/>
+  <text class="t" x="80" y="304">clk 100 MHz</text><text class="s" x="80" y="324">BTNC = reset</text>
+
+  <!-- 第二欄：輸入處理與計時 -->
+  <rect class="box" x="180" y="40" width="150" height="56" rx="6"/>
+  <text class="t" x="255" y="64">② HW_4_btn</text><text class="s" x="255" y="84">同步・去彈跳・脈衝</text>
+  <rect class="box" x="180" y="120" width="150" height="56" rx="6"/>
+  <text class="t" x="255" y="144">② HW_4_btn</text><text class="s" x="255" y="164">同步・去彈跳・脈衝</text>
+  <rect class="box" x="180" y="200" width="150" height="56" rx="6"/>
+  <text class="t" x="255" y="224">② 兩級同步</text><text class="m" x="255" y="244">sw_speed_s</text>
+  <rect class="box" x="180" y="280" width="150" height="56" rx="6"/>
+  <text class="t" x="255" y="304">① 1 ms 節拍</text><text class="m" x="255" y="324">tick_1ms</text>
+  <rect class="box" x="180" y="360" width="150" height="56" rx="6"/>
+  <text class="t" x="255" y="384">⑤ 1 Hz 閃爍</text><text class="m" x="255" y="404">blink_on</text>
+
+  <!-- 第三欄：遊戲 FSM -->
+  <rect class="fsm" x="370" y="40" width="170" height="296" rx="6"/>
+  <text class="t" x="455" y="66">③ 遊戲 FSM</text>
+  <text class="s" x="455" y="100">SERVE 發球</text>
+  <text class="s" x="455" y="124">PLAY 對打</text>
+  <text class="s" x="455" y="148">POINT 得分</text>
+  <text class="s" x="455" y="172">OVER 結束</text>
+  <line class="sep" x1="390" y1="192" x2="520" y2="192"/>
+  <text class="m" x="455" y="218">t_rel 判定計時</text>
+  <text class="m" x="455" y="242">step_ms 球速</text>
+  <text class="m" x="455" y="266">hit_pending</text>
+  <text class="m" x="455" y="290">server 發球方</text>
+
+  <!-- 第四欄：暫存器與輸出 -->
+  <rect class="reg" x="580" y="40" width="160" height="56" rx="6"/>
+  <text class="t" x="660" y="64">④ 球</text><text class="m" x="660" y="84">pos, to_left</text>
+  <rect class="reg" x="580" y="120" width="160" height="56" rx="6"/>
+  <text class="t" x="660" y="144">④ 計分</text><text class="m" x="660" y="164">score_l, score_r</text>
+  <rect class="out" x="580" y="280" width="160" height="56" rx="6"/>
+  <text class="t" x="660" y="304">⑥ LED 輸出選擇</text><text class="s" x="660" y="324">球 / 長條 × 閃爍</text>
+  <rect class="box" x="650" y="364" width="90" height="40" rx="6"/>
+  <text class="m" x="695" y="389">led[7:0]</text>
+
+  <!-- 連線 -->
+  <line class="e" x1="140" y1="68"  x2="178" y2="68"  marker-end="url(#a)"/>
+  <line class="e" x1="140" y1="148" x2="178" y2="148" marker-end="url(#a)"/>
+  <line class="e" x1="140" y1="228" x2="178" y2="228" marker-end="url(#a)"/>
+  <line class="e" x1="140" y1="308" x2="178" y2="308" marker-end="url(#a)"/>
+  <line class="e" x1="330" y1="68"  x2="368" y2="68"  marker-end="url(#a)"/>
+  <line class="e" x1="330" y1="148" x2="368" y2="148" marker-end="url(#a)"/>
+  <line class="e" x1="330" y1="228" x2="368" y2="228" marker-end="url(#a)"/>
+  <line class="e" x1="330" y1="308" x2="368" y2="308" marker-end="url(#a)"/>
+  <line class="e" x1="255" y1="336" x2="255" y2="358" marker-end="url(#a)"/>
+  <line class="e" x1="540" y1="68"  x2="578" y2="68"  marker-end="url(#a)"/>
+  <line class="e" x1="540" y1="148" x2="578" y2="148" marker-end="url(#a)"/>
+  <line class="e" x1="540" y1="308" x2="578" y2="308" marker-end="url(#a)"/>
+  <line class="e" x1="660" y1="176" x2="660" y2="278" marker-end="url(#a)"/>
+  <path class="e" d="M740,68 L756,68 L756,308 L742,308" marker-end="url(#a)"/>
+  <path class="e" d="M330,388 L610,388 L610,338" marker-end="url(#a)"/>
+  <line class="e" x1="695" y1="336" x2="695" y2="362" marker-end="url(#a)"/>
+</svg>

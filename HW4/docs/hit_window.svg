@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 680 228" width="680" height="228" role="img" aria-label="HW4 回擊判定窗：以右玩家、step_ms = 200 ms 為例，球在時間 0 抵達邊界 LD0；到達前後各 250 ms 內按下為有效回擊，更早按下判輸，到達後 250 ms 仍未按則出界判輸">
+  <style>
+    .led { fill: #f6f8fa; stroke: #8c959f; stroke-width: 1; }
+    .edge { fill: #fbefff; stroke: #8250df; stroke-width: 1.2; }
+    .gone { fill: none; stroke: #8c959f; stroke-width: 1; stroke-dasharray: 4 3; }
+    .bad { fill: #ffebe9; stroke: #cf222e; stroke-width: 1.2; }
+    .ok { fill: #dafbe1; stroke: #1a7f37; stroke-width: 1.2; }
+    .axis { stroke: #59636e; stroke-width: 1; }
+    .t { font: 600 14px "Noto Sans TC", "Microsoft JhengHei", "PingFang TC", sans-serif; fill: #1f2328; text-anchor: middle; dominant-baseline: central; }
+    .s { font: 12px "Noto Sans TC", "Microsoft JhengHei", "PingFang TC", sans-serif; fill: #59636e; text-anchor: middle; dominant-baseline: central; }
+    @media (prefers-color-scheme: dark) {
+      .led { fill: #161b22; stroke: #3d444d; }
+      .edge { fill: #271052; stroke: #ab7df8; }
+      .gone { stroke: #3d444d; }
+      .bad { fill: #3c0f13; stroke: #f85149; }
+      .ok { fill: #04260f; stroke: #3fb950; }
+      .axis { stroke: #9198a1; }
+      .t { fill: #e6edf3; }
+      .s { fill: #9198a1; }
+    }
+  </style>
+
+  <!-- 球的位置（時間軸 1 ms = 0.4 px，0 ms 在 x = 400） -->
+  <rect class="led" x="80"  y="40" width="80" height="34" rx="4"/><text class="s" x="120" y="57">LD4</text>
+  <rect class="led" x="160" y="40" width="80" height="34" rx="4"/><text class="s" x="200" y="57">LD3</text>
+  <rect class="led" x="240" y="40" width="80" height="34" rx="4"/><text class="s" x="280" y="57">LD2</text>
+  <rect class="led" x="320" y="40" width="80" height="34" rx="4"/><text class="s" x="360" y="57">LD1</text>
+  <rect class="edge" x="400" y="40" width="100" height="34" rx="4"/><text class="t" x="450" y="57">LD0 邊界</text>
+  <rect class="gone" x="500" y="40" width="100" height="34" rx="4"/><text class="s" x="550" y="57">出界</text>
+
+  <!-- 判定 -->
+  <rect class="bad" x="60"  y="92" width="240" height="40" rx="4"/><text class="t" x="180" y="112">早按 → 判輸</text>
+  <rect class="ok"  x="300" y="92" width="200" height="40" rx="4"/><text class="t" x="400" y="112">按下 → 有效回擊</text>
+  <rect class="bad" x="500" y="92" width="100" height="40" rx="4"/><text class="t" x="550" y="112">沒按 → 判輸</text>
+
+  <!-- 時間軸 -->
+  <line class="axis" x1="60" y1="152" x2="610" y2="152"/>
+  <line class="axis" x1="300" y1="146" x2="300" y2="158"/>
+  <line class="axis" x1="400" y1="146" x2="400" y2="158"/>
+  <line class="axis" x1="500" y1="146" x2="500" y2="158"/>
+  <text class="s" x="300" y="172">−250 ms</text>
+  <text class="s" x="400" y="172">0 到達</text>
+  <text class="s" x="500" y="172">+250 ms</text>
+  <text class="s" x="340" y="208">右玩家視角，以 step_ms = 200 ms 為例；判定窗固定 ±250 ms，與球速無關</text>
+</svg>
