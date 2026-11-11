@@ -518,11 +518,12 @@ again = OVER 且 (req_l 或 req_r)
 ### 12.1 為什麼要用 PS
 
 EGO-XZ7 的 USB 接頭 J2 是 USB 2.0 Type-A（《EGO-XZ7 硬體手冊》V1.2 §4.10），後面是 USB3320 PHY，以 ULPI 接到
-Zynq **PS 端**的 USB0 控制器（MIO 28 ~ 39），PL 拿不到這些腳。所以鍵盤一定要由 PS 讀：PS 跑一個裸機程式
+Zynq **PS 端**的 USB0 控制器（MIO 28 ~ 39），PL 拿不到這些腳。實際的板子上 J2 是上下疊的 4 個孔，中間隔著一顆
+GL850A USB 2.0 hub（`05E3:0608`，手冊沒寫，上板時從 UART 訊息看到）。所以鍵盤一定要由 PS 讀：PS 跑一個裸機程式
 當 USB host，把按鍵狀態寫進 PL 的 AXI GPIO，PL 的遊戲從 `kbd[7:0]` 讀。
 
 ```text
- USB 鍵盤 ─► J2 ─► USB3320 ─ULPI─► PS USB0 ◄── usb_kbd（裸機程式，Cortex-A9 #0）
+ USB 鍵盤 ─► J2（4 孔）─► GL850A hub ─► USB3320 ─ULPI─► PS USB0 ◄── usb_kbd（裸機程式，Cortex-A9 #0）
                                                  │ AXI GP0
                                                  ▼
                                PL：kbd_gpio（AXI GPIO，8 bit 輸出）─ kbd[7:0] ─► HW_5_pong
@@ -570,29 +571,54 @@ OR 起來送進 `HW_5_game` 的 `press_l`、`press_r`；bit 0、1、3、4 直接
 
 ### 12.4 USB host 程式（`usbh.c`）
 
-Zynq 的 USB 控制器在 host 模式是 EHCI 相容的，內建 transaction translator，低速、全速的鍵盤直接接在 root
-port 上，不需要 split transaction。Xilinx 的裸機驅動（XUsbPs）只做 device 模式，所以程式直接操作暫存器
-（位址見 SDK 的 `xusbps_hw.h`），只做「一把直接插著的鍵盤」需要的最少功能：
+Zynq 的 USB 控制器在 host 模式是 EHCI 相容的。Xilinx 的裸機驅動（XUsbPs）只做 device 模式，所以程式直接
+操作暫存器（位址見 SDK 的 `xusbps_hw.h`），只做「讀一把鍵盤」需要的最少功能。鍵盤可以接在 J2 後面的 hub 上
+（板子本來就是這樣），也可以直接接在 root port 上：
 
 1. **PHY 重設**：MIO 46（USB_RESET#）拉低 2 ms 再放開。
 2. **控制器**：`USBCMD.RST` 重設、`USBMODE = host`；經 ULPI viewport 讀 PHY 的 ID（USB3320 是 0424 / 0007，
    印出來確認 ULPI 通了），再寫 OTG Control：D+ / D− 下拉、`DrvVbus`、`DrvVbusExternal`（USB3320 的 CPEN
    打開 5V 開關 MIC2025，J2 才有電）；`PORTSC.PP = 1`。
-3. **async schedule**：兩個 QH 串成環——`qh_ctrl`（端點 0，head of reclamation）、`qh_int`（鍵盤的中斷 IN
-   端點）。每次改 QH 前先關 async schedule、改完再開。
-4. **連線**：等 `PORTSC.CCS`，等 200 ms 讓電源穩定，port reset 50 ms，從 `PORTSC.PSPD` 讀速度（低速 / 全速）。
-5. **列舉**：GET_DESCRIPTOR(device, 8) 取得端點 0 的封包大小 → SET_ADDRESS(1) → GET_DESCRIPTOR(device, 18)
-   → GET_DESCRIPTOR(configuration)，找 HID 介面（優先 boot keyboard：class 3 / subclass 1 / protocol 1）
-   與它的中斷 IN 端點 → SET_CONFIGURATION → SET_PROTOCOL(boot) → SET_IDLE(0)（只在按鍵變化時回報）。
-6. **讀按鍵**：在 `qh_int` 掛一個 IN qTD；鍵盤沒變化時回 NAK，控制器自己重試，有變化才回 8 byte 的 boot
-   report（byte 0 修飾鍵、byte 2 ~ 7 按著的鍵）。拿到就重新掛下一個。
-7. **錯誤或拔掉**：`kbd` 的按鍵與 bit 6 清 0，從第 1 步重來；再插上會重新列舉。
+3. **schedule**：
+   - async：兩個 QH 串成環——`qh_ctrl`（端點 0，head of reclamation，每次控制傳輸前改成這次的裝置）、
+     `qh_int`（直接插在 root port 的鍵盤的中斷 IN 端點）
+   - periodic：1024 項的 frame list，每 8 項指向 `qh_per`（hub 後面的鍵盤的中斷 IN 端點，每 8 ms 輪詢一次）
+
+   每次改 QH 前先關對應的 schedule、改完再開。
+4. **root port**：等 `PORTSC.CCS`，等 200 ms 讓電源穩定，port reset 50 ms，從 `PORTSC.PSPD` 讀速度。
+5. **列舉**（root port 的裝置位址 1）：GET_DESCRIPTOR(device, 8) 取得端點 0 的封包大小 → SET_ADDRESS →
+   GET_DESCRIPTOR(device, 18) → GET_DESCRIPTOR(configuration)。device class 是 9 就是 hub，走第 6 步；
+   否則當鍵盤，走第 7 步。
+6. **hub**（USB 2.0 §11.24）：SET_CONFIGURATION → GET_DESCRIPTOR(hub) 讀埠數與上電時間 → 每個埠
+   SET_FEATURE(PORT_POWER)。之後每次 `usbh_kbd_open` 掃一遍埠：GET_STATUS 看有沒有插東西；有的話等 100 ms
+   去彈跳 → SET_FEATURE(PORT_RESET) → 等 C_PORT_RESET → 從狀態讀速度（低速 / 全速 / 高速）→ 列舉
+   （位址 = 1 + 埠號）→ 第 7 步。不是鍵盤或失敗的埠先跳過，拔掉再插才重試。
+7. **鍵盤**：在組態裡找 HID 介面（優先 boot keyboard：class 3 / subclass 1 / protocol 1）與它的中斷 IN 端點
+   → SET_CONFIGURATION → SET_PROTOCOL(boot) → SET_IDLE(0)（只在按鍵變化時回報）。
+8. **讀按鍵**：在中斷 QH 掛一個 IN qTD；鍵盤沒變化時回 NAK，有變化才回 8 byte 的 boot report（byte 0
+   修飾鍵、byte 2 ~ 7 按著的鍵）。拿到就重新掛下一個。鍵盤接在 hub 上時，每 0.5 s 再問一次 hub 那個埠還插著沒。
+9. **錯誤或拔掉**：`kbd` 的按鍵與 bit 6 清 0。鍵盤接在 hub 上就保留 hub、重新掃埠；直接插在 root port 或 hub
+   本身拔掉就從第 1 步重來。
+
+**split transaction**：hub 是高速的，後面的低速 / 全速鍵盤要經 hub 的 transaction translator（TT）。QH 的
+endpoint capabilities 填 hub 位址與埠號，控制器自己送 start-split / complete-split：
+
+| QH | 放在 | EPS | 控制端點旗標 C | S-mask / C-mask |
+|---|---|---|---|---|
+| `qh_ctrl`（hub 後面的低速 / 全速裝置） | async | 01 / 00 | 1 | 0 / 0 |
+| `qh_per`（hub 後面的低速 / 全速鍵盤） | periodic | 01 / 00 | 0 | `0x01` / `0x1C`：microframe 0 送 start-split，2 ~ 4 收 complete-split |
+| `qh_per`（hub 後面的高速鍵盤） | periodic | 10 | 0 | `0x01` / 0（不用 split） |
+| `qh_int`（直接插 root port） | async | 01 / 00 | 0 | 0 / 0（走控制器內建的 TT，`TTCTRL` 的 hub 位址 0） |
+
+中斷端點經 TT 時一定要放在 periodic schedule：放在 async schedule 的 split 會被當成 bulk，而低速裝置不能做
+bulk。
 
 刻意的簡化與限制：
 
-- 中斷端點照理要放在 periodic schedule；這裡放在 async schedule，線上看到的 IN token 和 periodic 一樣，只是
-  輪詢得比較勤，對單一鍵盤沒有差別。
-- 只支援直接插在 J2 的鍵盤，不支援 USB hub（插 hub 或有內建 hub 的鍵盤會列舉失敗）。
+- 直接插在 root port 時中斷端點放在 async schedule（線上看到的 IN token 和 periodic 一樣，只是輪詢得比較勤）。
+  EGO-XZ7 的 J2 後面固定有 hub，這條路徑上板用不到。
+- 只支援一層 hub：hub 後面再接 hub（例如帶 USB 孔、有內建 hub 的鍵盤）不會被當成鍵盤。
+- 鍵盤接在 hub 上時插拔靠每 0.5 s 問一次埠狀態偵測，沒用 hub 的狀態變化中斷端點。
 - 用 boot protocol，所以同時最多 6 個鍵（boot report 的上限），兩個人一起按 W、↑ 等完全沒問題。
 - QH 的 overlay 保留 DT（DATA0 / DATA1 交替）位元，清掉的話每隔一個報告會被當成重送丟掉。
 - `main()` 一開始就把 D-cache 關掉，QH、qTD、資料緩衝都不必手動清 cache。
@@ -719,8 +745,8 @@ BRAM；100 MHz 下 WNS +0.30 ns、WHS +0.03 ns，沒有 latch，沒有 critical 
 | 項目 | 目前規格 | 說明 |
 |---|---|---|
 | BTNU、BTND | 不使用 | 可以加暫停（BTNU 切換，暫停時 `frame_tick` 不更新遊戲） |
-| USB host 程式 | 裸機精簡 EHCI host，已編譯，還沒上板 | 看 UART1 的訊息確認 PHY ID、列舉、按鍵報告；失敗時把訊息貼回來修 |
-| 鍵盤相容性 | boot protocol、直接插 J2、不支援 hub | 有內建 hub 的鍵盤（例如帶 USB 孔的）會列舉失敗，換一把普通鍵盤 |
+| USB host 程式 | 裸機精簡 EHCI host，支援 J2 後面的 GL850A hub | 上板確認：PHY ID、hub 列舉正確；經 hub 的 split transaction 與按鍵報告待確認 |
+| 鍵盤相容性 | boot protocol、一層 hub | 有內建 hub 的鍵盤（例如帶 USB 孔的）不支援，換一把普通鍵盤 |
 | 按鍵配置 | 左 W / S / D，右 ↑ / ↓ / ← | 在 `sw/usb_kbd/src/main.c` 的 `KEY_*` 改，PL 不用動 |
 | 球拍手感 | 按住移動，每幀 6 像素 | 上板後依手感調 `PADDLE_SPEED` |
 | 加速 | 每 2 次回擊加 2 像素／幀，上限 12 | 太快或太慢就調 `SPEEDUP_HITS`、`VX_MAX` |

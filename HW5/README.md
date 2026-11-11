@@ -14,7 +14,8 @@ HW4 的雙人乒乓球搬到螢幕上：畫面從板上的 HDMI 輸出（640×48
 - 不用 framebuffer：每個像素直接比對球、球拍、牆、中線、數字這些矩形
 - HDMI 輸出級與 ADV7511 設定沿用 HW3（YCbCr 4:2:2）
 - USB 鍵盤：J2 接在 Zynq PS 的 USB0，PL 碰不到，所以 PS 跑一個裸機 USB host 程式（`sw/usb_kbd`）讀鍵盤，
-  經 AXI GPIO 把按鍵狀態交給 PL（SPEC §12）
+  經 AXI GPIO 把按鍵狀態交給 PL（SPEC §12）。J2 的 4 個孔後面是板上的 GL850A hub，程式會先設定 hub，
+  鍵盤插哪個孔都可以
 
 ![模擬畫面](docs/sim_play.png)
 
@@ -63,8 +64,12 @@ HW4 的雙人乒乓球搬到螢幕上：畫面從板上的 HDMI 輸出（640×48
 3. 開機，二選一：
    - **SD 卡**：`BOOT.bin` 複製到 FAT32 SD 卡根目錄，開機模式跳線設成 SD，上電。
    - **JTAG**：開機模式設成 JTAG，執行 `C:\Xilinx\SDK\2018.3\bin\xsct.bat HW5/sw/Run-JTAG.tcl`。
-4. 開 UART1（板上的 USB-UART，115200 8N1）看 PS 的訊息：PHY ID、列舉過程、每次按鍵變化。
-   LD2 閃表示 PS 程式在跑；插上鍵盤、列舉完成後 LD1 亮。
+4. 開 UART1 看 PS 的訊息：PHY ID、hub 與鍵盤的列舉過程、每次按鍵變化。UART1 和 JTAG 是同一條 micro-USB
+   （FTDI 的第二個通道，Windows 上是 `USB Serial Port (COMn)`），用 MobaXterm 等終端機開 Serial、115200、
+   Flow control 設 None；只看不用打字。LD2 閃表示 PS 程式在跑；鍵盤插進 J2 任一孔、列舉完成後 LD1 亮。
+
+xsct 回報 `DR shift through all zeroes`（JTAG 鏈上看不到晶片）時，通常是板子還沒上電，或剛重插 USB 線：
+確認 S1 打開、電源燈亮，等幾秒再跑一次。
 
 只用 Vivado 燒 bitstream（不跑 PS 程式）時畫面照常輸出，但球拍不會動；BTNL / BTNR 仍可發球。
 
@@ -134,5 +139,7 @@ PASS / FAIL。PS 與 USB 鍵盤不在模擬範圍內，測試檔直接給 `kbd`�
 - [x] 設計原始碼、測試檔（xsim 2018.3：`HW_5_game_tb PASS`、`HW_5_tb PASS`）
 - [x] Vivado 2018.3 實作（含 PS）：1193 LUT、862 FF，沒有 DSP、BRAM；WNS +0.30 ns、WHS +0.03 ns，bitstream 產生成功
 - [x] PS 程式與 `BOOT.bin` 用 SDK 2018.3 編譯成功
-- [ ] 上板：確認 USB 鍵盤列舉（看 UART1 訊息）、按鍵反應
+- [x] 上板（JTAG）：bitstream、PS 程式執行，UART1 看到 USB3320 PHY ID、J2 後面的 GL850A hub（`05E3:0608`）列舉成功
+- [x] 加上 hub 支援（hub 設定、埠電源與 reset、split transaction、periodic schedule），已編譯並載入板子
+- [ ] 上板：確認經 hub 的鍵盤列舉（看 UART1 的 `keyboard ready on hub port N`）、按鍵反應
 - [ ] 上板試玩：調整 `PADDLE_SPEED`、加速幅度、確認顏色
