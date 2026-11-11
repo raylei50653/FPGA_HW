@@ -1,0 +1,73 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 560" width="760" height="560" role="img" aria-label="HW5 畫面配置（640×480，1:1）：上下牆各 8 像素，中線虛線在 x 318 ~ 322，左球拍 x 32 ~ 40，右球拍 x 600 ~ 608，分數七段數字在 x 256 ~ 288 與 352 ~ 384、y 24 ~ 80">
+  <style>
+    .l { font: 12px "Noto Sans TC", "Microsoft JhengHei", "PingFang TC", sans-serif; fill: #59636e; }
+    .m { font: 12px ui-monospace, "Cascadia Code", Consolas, monospace; fill: #59636e; }
+    .in { font: 12px "Noto Sans TC", "Microsoft JhengHei", "PingFang TC", sans-serif; fill: #b0b0b0; }
+    .tk { stroke: #8c959f; stroke-width: 1; }
+    @media (prefers-color-scheme: dark) {
+      .l, .m { fill: #9198a1; }
+      .tk { stroke: #6e7681; }
+    }
+  </style>
+  <defs>
+    <marker id="v" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#b0b0b0"/>
+    </marker>
+  </defs>
+
+  <!-- 螢幕本體：原點 (80, 30)，1 像素 = 1 單位 -->
+  <g transform="translate(80,30)">
+    <rect x="0" y="0" width="640" height="480" fill="#000000"/>
+    <rect x="0" y="0" width="640" height="8" fill="#ffffff"/>
+    <rect x="0" y="472" width="640" height="8" fill="#ffffff"/>
+    <line x1="320" y1="8" x2="320" y2="472" stroke="#808080" stroke-width="4" stroke-dasharray="8 8"/>
+
+    <!-- 左分數「3」：a b c d g -->
+    <g fill="#ff8000">
+      <rect x="256" y="24" width="32" height="8"/>
+      <rect x="280" y="24" width="8" height="32"/>
+      <rect x="280" y="48" width="8" height="32"/>
+      <rect x="256" y="72" width="32" height="8"/>
+      <rect x="256" y="48" width="32" height="8"/>
+    </g>
+    <!-- 右分數「1」：b c -->
+    <g fill="#00c0ff">
+      <rect x="376" y="24" width="8" height="32"/>
+      <rect x="376" y="48" width="8" height="32"/>
+    </g>
+
+    <rect x="32" y="150" width="8" height="64" fill="#ff8000"/>
+    <rect x="600" y="300" width="8" height="64" fill="#00c0ff"/>
+    <rect x="200" y="240" width="8" height="8" fill="#ffffff"/>
+    <line x1="212" y1="246" x2="262" y2="271" stroke="#b0b0b0" stroke-width="1.2" stroke-dasharray="4 3" marker-end="url(#v)"/>
+
+    <text class="in" x="48" y="178">左球拍</text>
+    <text class="in" x="48" y="196">pad_l_y ~ +64</text>
+    <text class="in" x="592" y="328" text-anchor="end">右球拍</text>
+    <text class="in" x="592" y="346" text-anchor="end">pad_r_y ~ +64</text>
+    <text class="in" x="196" y="232" text-anchor="end">球 8×8</text>
+    <text class="in" x="306" y="294" text-anchor="end">每幀移動 (±spd, vy)</text>
+    <text class="in" x="230" y="100" text-anchor="middle">score_l</text>
+    <text class="in" x="410" y="100" text-anchor="middle">score_r</text>
+    <text class="in" x="328" y="420">中線 318 ~ 322</text>
+    <text class="in" x="12" y="460">球越過左邊 → 左方失分</text>
+    <text class="in" x="628" y="460" text-anchor="end">球越過右邊 → 右方失分</text>
+    <text class="in" x="12" y="22">上牆（白）</text>
+    <rect x="0" y="0" width="640" height="480" fill="none" stroke="#59636e" stroke-width="1"/>
+  </g>
+
+  <!-- x 刻度 -->
+  <line class="tk" x1="80" y1="512" x2="80" y2="520"/><text class="m" x="80" y="534" text-anchor="middle">0</text>
+  <line class="tk" x1="116" y1="512" x2="116" y2="520"/><text class="m" x="116" y="534" text-anchor="middle">32~40</text>
+  <line class="tk" x1="352" y1="512" x2="352" y2="520"/><text class="m" x="352" y="534" text-anchor="middle">256~288</text>
+  <line class="tk" x1="400" y1="512" x2="400" y2="520"/><text class="m" x="400" y="550" text-anchor="middle">320</text>
+  <line class="tk" x1="448" y1="512" x2="448" y2="520"/><text class="m" x="448" y="534" text-anchor="middle">352~384</text>
+  <line class="tk" x1="684" y1="512" x2="684" y2="520"/><text class="m" x="684" y="534" text-anchor="middle">600~608</text>
+  <line class="tk" x1="720" y1="512" x2="720" y2="520"/><text class="m" x="732" y="550" text-anchor="middle">640</text>
+
+  <!-- y 刻度 -->
+  <line class="tk" x1="70" y1="34" x2="78" y2="34"/><text class="m" x="66" y="38" text-anchor="end">0~8</text>
+  <line class="tk" x1="70" y1="82" x2="78" y2="82"/><text class="m" x="66" y="86" text-anchor="end">24~80</text>
+  <line class="tk" x1="70" y1="270" x2="78" y2="270"/><text class="m" x="66" y="274" text-anchor="end">240</text>
+  <line class="tk" x1="70" y1="506" x2="78" y2="506"/><text class="m" x="66" y="510" text-anchor="end">472~480</text>
+</svg>

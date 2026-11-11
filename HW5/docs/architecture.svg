@@ -1,0 +1,94 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 470" width="800" height="470" role="img" aria-label="HW5 HDMI 乒乓球架構圖：上排視訊路徑，像素致能 → 視訊時序 → 畫面合成 → HDMI 輸出級 → ADV7511；下排遊戲路徑，BTNL、BTNR、SW0 → 按鈕介面 → HW_5_game（每幀更新）→ 物件座標交給畫面合成，並驅動 LED">
+  <style>
+    .box { fill: #f6f8fa; stroke: #8c959f; stroke-width: 1.2; }
+    .reuse { fill: #dafbe1; stroke: #1a7f37; stroke-width: 1.2; }
+    .new { fill: #fbefff; stroke: #8250df; stroke-width: 1.2; }
+    .out { fill: #fff1e5; stroke: #bc4c00; stroke-width: 1.2; }
+    .t { font: 600 14px "Noto Sans TC", "Microsoft JhengHei", "PingFang TC", sans-serif; fill: #1f2328; text-anchor: middle; }
+    .s { font: 12px "Noto Sans TC", "Microsoft JhengHei", "PingFang TC", sans-serif; fill: #59636e; text-anchor: middle; }
+    .l { font: 12px "Noto Sans TC", "Microsoft JhengHei", "PingFang TC", sans-serif; fill: #59636e; }
+    .m { font: 12px ui-monospace, "Cascadia Code", Consolas, monospace; fill: #59636e; }
+    .e { fill: none; stroke: #59636e; stroke-width: 1.4; }
+    .ah { fill: #59636e; }
+    @media (prefers-color-scheme: dark) {
+      .box { fill: #161b22; stroke: #3d444d; }
+      .reuse { fill: #04260f; stroke: #3fb950; }
+      .new { fill: #271052; stroke: #ab7df8; }
+      .out { fill: #3d1d00; stroke: #db6d28; }
+      .t { fill: #e6edf3; }
+      .s, .l, .m { fill: #9198a1; }
+      .e { stroke: #9198a1; }
+      .ah { fill: #9198a1; }
+    }
+  </style>
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path class="ah" d="M0,0 L10,5 L0,10 z"/>
+    </marker>
+  </defs>
+
+  <!-- 上排：視訊路徑 -->
+  <rect class="reuse" x="20" y="40" width="120" height="56" rx="6"/>
+  <text class="t" x="80" y="64">① 像素致能</text><text class="s" x="80" y="84">pix_ce 25 MHz</text>
+  <rect class="reuse" x="170" y="40" width="150" height="56" rx="6"/>
+  <text class="t" x="245" y="64">② HW_5_timing</text><text class="s" x="245" y="84">640×480@60</text>
+  <rect class="new" x="390" y="40" width="160" height="56" rx="6"/>
+  <text class="t" x="470" y="64">⑦ 畫面合成</text><text class="s" x="470" y="84">R1 比較・R2 選色</text>
+  <rect class="reuse" x="600" y="40" width="180" height="56" rx="6"/>
+  <text class="t" x="690" y="64">⑧ HDMI 輸出級</text><text class="s" x="690" y="84">YCbCr 4:2:2・I2C 設定</text>
+  <rect class="out" x="600" y="140" width="130" height="50" rx="6"/>
+  <text class="t" x="665" y="170">ADV7511 → 螢幕</text>
+
+  <line class="e" x1="140" y1="68" x2="168" y2="68" marker-end="url(#a)"/>
+  <line class="e" x1="320" y1="68" x2="388" y2="68" marker-end="url(#a)"/>
+  <text class="s" x="355" y="58">座標・同步</text>
+  <line class="e" x1="550" y1="68" x2="598" y2="68" marker-end="url(#a)"/>
+  <text class="s" x="575" y="58">RGB888</text>
+  <line class="e" x1="665" y1="96" x2="665" y2="138" marker-end="url(#a)"/>
+
+  <!-- 下排：遊戲路徑 -->
+  <rect class="box" x="20" y="240" width="120" height="44" rx="6"/>
+  <text class="t" x="80" y="267">BTNL 左球拍</text>
+  <rect class="box" x="20" y="300" width="120" height="44" rx="6"/>
+  <text class="t" x="80" y="327">BTNR 右球拍</text>
+  <rect class="box" x="20" y="360" width="120" height="44" rx="6"/>
+  <text class="t" x="80" y="387">SW0 起始球速</text>
+
+  <rect class="reuse" x="170" y="230" width="150" height="180" rx="6"/>
+  <text class="t" x="245" y="296">③ HW_5_btn ×2</text>
+  <text class="s" x="245" y="318">同步・去彈跳</text>
+  <text class="m" x="245" y="338" text-anchor="middle">press、held</text>
+  <text class="s" x="245" y="370">SW0 兩級同步</text>
+
+  <line class="e" x1="140" y1="262" x2="168" y2="262" marker-end="url(#a)"/>
+  <line class="e" x1="140" y1="322" x2="168" y2="322" marker-end="url(#a)"/>
+  <line class="e" x1="140" y1="382" x2="168" y2="382" marker-end="url(#a)"/>
+
+  <rect class="new" x="390" y="230" width="160" height="180" rx="6"/>
+  <text class="t" x="470" y="256">HW_5_game</text>
+  <text class="s" x="470" y="282">④ 遊戲 FSM</text>
+  <text class="s" x="470" y="304">⑤ 球與球拍</text>
+  <text class="s" x="470" y="326">⑥ 計分・閃爍</text>
+  <text class="s" x="470" y="360">每個 frame_tick</text>
+  <text class="s" x="470" y="380">更新一次</text>
+
+  <line class="e" x1="320" y1="320" x2="388" y2="320" marker-end="url(#a)"/>
+
+  <path class="e" d="M245,96 L245,200 L430,200 L430,228" marker-end="url(#a)"/>
+  <text class="m" x="253" y="150">frame_tick</text>
+  <line class="e" x1="510" y1="230" x2="510" y2="98" marker-end="url(#a)"/>
+  <text class="l" x="502" y="150" text-anchor="end">物件座標・分數</text>
+
+  <rect class="out" x="600" y="300" width="180" height="56" rx="6"/>
+  <text class="t" x="690" y="324">⑨ LED</text><text class="s" x="690" y="344">心跳・hdmi_ok・長條</text>
+  <line class="e" x1="550" y1="328" x2="598" y2="328" marker-end="url(#a)"/>
+  <line class="e" x1="760" y1="96" x2="760" y2="298" marker-end="url(#a)"/>
+  <text class="m" x="752" y="250" text-anchor="end">hdmi_ok</text>
+
+  <!-- 圖例 -->
+  <rect class="reuse" x="20" y="436" width="14" height="14" rx="3"/>
+  <text class="l" x="42" y="448">沿用 HW3 / HW4</text>
+  <rect class="new" x="160" y="436" width="14" height="14" rx="3"/>
+  <text class="l" x="182" y="448">新寫</text>
+  <text class="l" x="780" y="448" text-anchor="end">clk 100 MHz 驅動全部暫存器・BTNC = reset</text>
+</svg>

@@ -1,0 +1,86 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 700 300" width="700" height="300" role="img" aria-label="HW5 擊球判定：左圖，球拍 64 像素分成 8 段，由上到下反彈 vy 為 −4、−3、−2、−1、+1、+2、+3、+4；右圖，球這一幀從擊球面右邊跑到左邊即算擊到，球被拉回擊球面並反向">
+  <style>
+    .pad { fill: #fff1e5; stroke: #bc4c00; stroke-width: 1.2; }
+    .zl { stroke: #bc4c00; stroke-width: 0.8; }
+    .ball { fill: #f6f8fa; stroke: #1f2328; stroke-width: 1.2; }
+    .ghost { fill: none; stroke: #8250df; stroke-width: 1.2; stroke-dasharray: 4 3; }
+    .face { stroke: #1a7f37; stroke-width: 1.4; stroke-dasharray: 5 4; }
+    .t { font: 600 14px "Noto Sans TC", "Microsoft JhengHei", "PingFang TC", sans-serif; fill: #1f2328; }
+    .l { font: 12px "Noto Sans TC", "Microsoft JhengHei", "PingFang TC", sans-serif; fill: #59636e; }
+    .m { font: 12px ui-monospace, "Cascadia Code", Consolas, monospace; fill: #59636e; }
+    .e { fill: none; stroke: #59636e; stroke-width: 1.3; }
+    .ah { fill: #59636e; }
+    @media (prefers-color-scheme: dark) {
+      .pad { fill: #3d1d00; stroke: #db6d28; }
+      .zl { stroke: #db6d28; }
+      .ball { fill: #161b22; stroke: #e6edf3; }
+      .ghost { stroke: #ab7df8; }
+      .face { stroke: #3fb950; }
+      .t { fill: #e6edf3; }
+      .l, .m { fill: #9198a1; }
+      .e { stroke: #9198a1; }
+      .ah { fill: #9198a1; }
+    }
+  </style>
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path class="ah" d="M0,0 L10,5 L0,10 z"/>
+    </marker>
+  </defs>
+
+  <!-- 左圖：反彈角度（放大 3 倍：1 像素 = 3 單位） -->
+  <text class="t" x="40" y="24">反彈角度：看球的中心打在哪一段</text>
+  <rect class="pad" x="80" y="50" width="24" height="192"/>
+  <line class="zl" x1="80" y1="74" x2="104" y2="74"/>
+  <line class="zl" x1="80" y1="98" x2="104" y2="98"/>
+  <line class="zl" x1="80" y1="122" x2="104" y2="122"/>
+  <line class="zl" x1="80" y1="146" x2="104" y2="146"/>
+  <line class="zl" x1="80" y1="170" x2="104" y2="170"/>
+  <line class="zl" x1="80" y1="194" x2="104" y2="194"/>
+  <line class="zl" x1="80" y1="218" x2="104" y2="218"/>
+  <text class="m" x="72" y="66" text-anchor="end">0</text>
+  <text class="m" x="72" y="90" text-anchor="end">1</text>
+  <text class="m" x="72" y="114" text-anchor="end">2</text>
+  <text class="m" x="72" y="138" text-anchor="end">3</text>
+  <text class="m" x="72" y="162" text-anchor="end">4</text>
+  <text class="m" x="72" y="186" text-anchor="end">5</text>
+  <text class="m" x="72" y="210" text-anchor="end">6</text>
+  <text class="m" x="72" y="234" text-anchor="end">7</text>
+  <line class="e" x1="110" y1="62" x2="180" y2="38" marker-end="url(#a)"/>
+  <line class="e" x1="110" y1="86" x2="180" y2="68" marker-end="url(#a)"/>
+  <line class="e" x1="110" y1="110" x2="180" y2="98" marker-end="url(#a)"/>
+  <line class="e" x1="110" y1="134" x2="180" y2="128" marker-end="url(#a)"/>
+  <line class="e" x1="110" y1="158" x2="180" y2="164" marker-end="url(#a)"/>
+  <line class="e" x1="110" y1="182" x2="180" y2="194" marker-end="url(#a)"/>
+  <line class="e" x1="110" y1="206" x2="180" y2="224" marker-end="url(#a)"/>
+  <line class="e" x1="110" y1="230" x2="180" y2="254" marker-end="url(#a)"/>
+  <text class="m" x="190" y="42">vy = −4</text>
+  <text class="m" x="190" y="72">vy = −3</text>
+  <text class="m" x="190" y="102">vy = −2</text>
+  <text class="m" x="190" y="132">vy = −1</text>
+  <text class="m" x="190" y="168">vy = +1</text>
+  <text class="m" x="190" y="198">vy = +2</text>
+  <text class="m" x="190" y="228">vy = +3</text>
+  <text class="m" x="190" y="258">vy = +4</text>
+  <text class="l" x="40" y="284">zone = (ny + 4 − pad_y) / 8，限制在 0 ~ 7</text>
+
+  <!-- 右圖：穿過擊球面 -->
+  <text class="t" x="360" y="24">擊球：這一幀穿過擊球面</text>
+  <rect class="pad" x="380" y="50" width="24" height="192"/>
+  <line class="face" x1="404" y1="40" x2="404" y2="252"/>
+  <text class="m" x="410" y="268">HIT_L_X = 40</text>
+
+  <rect class="ball" x="470" y="90" width="24" height="24"/>
+  <text class="l" x="502" y="98">這一幀的 ball_x</text>
+  <text class="l" x="502" y="114">（≥ HIT_L_X）</text>
+  <rect class="ghost" x="390" y="102" width="24" height="24"/>
+  <line class="e" x1="466" y1="108" x2="420" y2="113" marker-end="url(#a)"/>
+  <text class="l" x="420" y="146">nx = ball_x − spd</text>
+  <text class="l" x="420" y="162">（&lt; HIT_L_X：穿過了）</text>
+
+  <rect class="ball" x="404" y="196" width="24" height="24"/>
+  <line class="e" x1="432" y1="208" x2="490" y2="208" marker-end="url(#a)"/>
+  <text class="l" x="500" y="204">拉回 ball_x ← HIT_L_X</text>
+  <text class="l" x="500" y="220">反向、vy ← BOUNCE_VY(zone)</text>
+  <text class="l" x="360" y="284">只看重疊會漏判：一幀最多走 12 像素，比球拍寬 8 像素還多</text>
+</svg>
