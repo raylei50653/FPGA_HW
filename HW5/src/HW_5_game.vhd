@@ -3,7 +3,8 @@ use IEEE.STD_LOGIC_1164.ALL;
 use IEEE.NUMERIC_STD.ALL;
 
 -- HW5 遊戲邏輯：狀態機、球與球拍、計分、閃爍（規格見 HW5/SPEC.md §5 ~ §7、§10.3）
---   所有暫存器只在 frame_tick 更新（按鍵事件 req_l / req_r 例外：隨時鎖存，frame_tick 時清除）。
+--   所有暫存器只在 frame_tick 更新；例外是發球鍵事件 req_l / req_r（隨時鎖存，frame_tick 時清除），
+--   它們不直接畫在畫面上。
 --   frame_tick 落在每幀的垂直遮沒開頭，畫面合成在整幀可視期間看到的座標都不變。
 --
 --   ④ 遊戲 FSM      state、server、wait_cnt、req_l、req_r
@@ -28,10 +29,12 @@ entity HW_5_game is
         clk        : in  STD_LOGIC;
         reset      : in  STD_LOGIC;
         frame_tick : in  STD_LOGIC;             -- 每幀一拍，落在垂直遮沒開頭
-        press_l    : in  STD_LOGIC;             -- 按下瞬間的單拍脈衝（去彈跳後）
-        press_r    : in  STD_LOGIC;
-        held_l     : in  STD_LOGIC;             -- 按鈕是否按住（去彈跳後）
-        held_r     : in  STD_LOGIC;
+        press_l    : in  STD_LOGIC;             -- 發球鍵按下瞬間的單拍脈衝（左方：鍵盤 D 或 BTNL）
+        press_r    : in  STD_LOGIC;             -- 右方：鍵盤 ← 或 BTNR
+        up_l       : in  STD_LOGIC;             -- 已同步的鍵盤電位：W 按住（左球拍往上）
+        dn_l       : in  STD_LOGIC;             -- S 按住（左球拍往下）
+        up_r       : in  STD_LOGIC;             -- ↑ 按住（右球拍往上）
+        dn_r       : in  STD_LOGIC;             -- ↓ 按住（右球拍往下）
         sw_speed   : in  STD_LOGIC;             -- 已同步的 SW0：'1' = 快速發球
         phase      : out integer range 0 to 3;  -- 0 SERVE、1 PLAY、2 POINT、3 OVER
         server     : out STD_LOGIC;             -- '1' = 左方發球；POINT / OVER 中也代表得分方 / 勝方
@@ -49,17 +52,23 @@ end HW_5_game;
 architecture Behavioral of HW_5_game is
 
     -- 畫面配置（SPEC §4.1）
-    constant PAD_H      : positive := 64;
-    constant PAD_Y_MIN  : positive := 8;
-    constant PAD_Y_MAX  : positive := 408;      -- 472 − 64
-    constant PAD_Y_INIT : positive := 208;      -- 置中
-    constant BALL       : positive := 8;
-    constant BALL_Y_MIN : positive := 8;
-    constant BALL_Y_MAX : positive := 464;      -- 472 − 8
-    constant HIT_L_X    : positive := 40;       -- 左球拍擊球面（右緣）
-    constant HIT_R_X    : positive := 592;      -- 右球拍擊球面（左緣 600）減球寬
-    constant OUT_R_X    : positive := 632;      -- 球的右緣碰到畫面右邊（640）
-    constant SERVE_DY   : positive := 28;       -- 發球時球對齊球拍中央：(64 − 8) / 2
+    constant FIELD_T    : positive := 8;        -- 球場範圍 y 8 ~ 472（上下牆各 8）
+    constant FIELD_B    : positive := 472;
+    constant PAD_W      : positive := 12;
+    constant PAD_H      : positive := 96;
+    constant PAD_L_X    : positive := 32;       -- 左球拍 32 ~ 44
+    constant PAD_R_X    : positive := 596;      -- 右球拍 596 ~ 608
+    constant PAD_Y_MIN  : positive := FIELD_T;
+    constant PAD_Y_MAX  : positive := FIELD_B - PAD_H;            -- 376
+    constant PAD_Y_INIT : positive := (PAD_Y_MIN + PAD_Y_MAX) / 2; -- 192，置中
+    constant BALL       : positive := 12;
+    constant BALL_Y_MIN : positive := FIELD_T;
+    constant BALL_Y_MAX : positive := FIELD_B - BALL;             -- 460
+    constant HIT_L_X    : positive := PAD_L_X + PAD_W;            -- 44：左球拍擊球面（右緣）
+    constant HIT_R_X    : positive := PAD_R_X - BALL;             -- 584：右球拍擊球面（左緣）減球寬
+    constant OUT_R_X    : positive := 640 - BALL;                 -- 628：球的右緣碰到畫面右邊
+    constant SERVE_DY   : positive := (PAD_H - BALL) / 2;         -- 42：發球時球對齊球拍中央
+    constant ZONE_H     : positive := PAD_H / 8;                  -- 12：反彈角度每段的高度
 
     -- 反彈角度：球拍分 8 段，由上到下（SPEC §5.5）；發球的垂直速度（SPEC §5.2）
     type vy_table_t is array (0 to 7) of integer range -4 to 4;
@@ -192,15 +201,15 @@ begin
     out_edge <= '1' when (to_left = '1' and nx <= 0) or
                          (to_left = '0' and nx >= OUT_R_X) else '0';
 
-    -- 反彈角度：球的中心落在球拍哪一段，8 像素一段（SPEC §5.5）
+    -- 反彈角度：球的中心落在球拍哪一段，ZONE_H（12）像素一段（SPEC §5.5）
     zone_raw <= ny + BALL / 2 - pad_rx;
-    zone <= 0 when zone_raw < 8  else
-            1 when zone_raw < 16 else
-            2 when zone_raw < 24 else
-            3 when zone_raw < 32 else
-            4 when zone_raw < 40 else
-            5 when zone_raw < 48 else
-            6 when zone_raw < 56 else
+    zone <= 0 when zone_raw < 1 * ZONE_H else
+            1 when zone_raw < 2 * ZONE_H else
+            2 when zone_raw < 3 * ZONE_H else
+            3 when zone_raw < 4 * ZONE_H else
+            4 when zone_raw < 5 * ZONE_H else
+            5 when zone_raw < 6 * ZONE_H else
+            6 when zone_raw < 7 * ZONE_H else
             7;
 
     -- 速度（SPEC §5.6）
@@ -263,20 +272,23 @@ begin
     end process;
 
     --------------------------------------------------
-    -- ⑤ 球拍：按住往上、放開往下，停在牆邊（SPEC §5.1），任何狀態都會動
+    -- ⑤ 球拍（SPEC §5.1）：鍵盤按住「上」每幀往上、按住「下」每幀往下；
+    --   都沒按或兩個同時按就停在原地，碰到牆就停住，任何狀態都會動
     --------------------------------------------------
     process(clk)
     begin
         if rising_edge(clk) then
             if reset = '1' then
                 pad_l <= PAD_Y_INIT;
-            elsif frame_tick = '1' and held_l = '1' and pad_l - PADDLE_SPEED < PAD_Y_MIN then
+            elsif frame_tick = '0' or up_l = dn_l then
+                null;                                   -- 沒按或上下同時按：停在原地
+            elsif up_l = '1' and pad_l - PADDLE_SPEED < PAD_Y_MIN then
                 pad_l <= PAD_Y_MIN;
-            elsif frame_tick = '1' and held_l = '1' then
+            elsif up_l = '1' then
                 pad_l <= pad_l - PADDLE_SPEED;
-            elsif frame_tick = '1' and pad_l + PADDLE_SPEED > PAD_Y_MAX then
+            elsif pad_l + PADDLE_SPEED > PAD_Y_MAX then
                 pad_l <= PAD_Y_MAX;
-            elsif frame_tick = '1' then
+            else
                 pad_l <= pad_l + PADDLE_SPEED;
             end if;
         end if;
@@ -287,13 +299,15 @@ begin
         if rising_edge(clk) then
             if reset = '1' then
                 pad_r <= PAD_Y_INIT;
-            elsif frame_tick = '1' and held_r = '1' and pad_r - PADDLE_SPEED < PAD_Y_MIN then
+            elsif frame_tick = '0' or up_r = dn_r then
+                null;
+            elsif up_r = '1' and pad_r - PADDLE_SPEED < PAD_Y_MIN then
                 pad_r <= PAD_Y_MIN;
-            elsif frame_tick = '1' and held_r = '1' then
+            elsif up_r = '1' then
                 pad_r <= pad_r - PADDLE_SPEED;
-            elsif frame_tick = '1' and pad_r + PADDLE_SPEED > PAD_Y_MAX then
+            elsif pad_r + PADDLE_SPEED > PAD_Y_MAX then
                 pad_r <= PAD_Y_MAX;
-            elsif frame_tick = '1' then
+            else
                 pad_r <= pad_r + PADDLE_SPEED;
             end if;
         end if;

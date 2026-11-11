@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 700 300" width="700" height="300" role="img" aria-label="HW5 擊球判定：左圖，球拍 64 像素分成 8 段，由上到下反彈 vy 為 −4、−3、−2、−1、+1、+2、+3、+4；右圖，球這一幀從擊球面右邊跑到左邊即算擊到，球被拉回擊球面並反向">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 700 300" width="700" height="300" role="img" aria-label="HW5 擊球判定：左圖，球拍 96 像素分成 8 段（每段 12 像素），由上到下反彈 vy 為 −4、−3、−2、−1、+1、+2、+3、+4；右圖，球這一幀從擊球面右邊跑到左邊即算擊到，球被拉回擊球面並反向">
   <style>
     .pad { fill: #fff1e5; stroke: #bc4c00; stroke-width: 1.2; }
     .zl { stroke: #bc4c00; stroke-width: 0.8; }
@@ -62,13 +62,13 @@
   <text class="m" x="190" y="198">vy = +2</text>
   <text class="m" x="190" y="228">vy = +3</text>
   <text class="m" x="190" y="258">vy = +4</text>
-  <text class="l" x="40" y="284">zone = (ny + 4 − pad_y) / 8，限制在 0 ~ 7</text>
+  <text class="l" x="40" y="284">zone = (ny + 6 − pad_y) / 12，限制在 0 ~ 7</text>
 
   <!-- 右圖：穿過擊球面 -->
   <text class="t" x="360" y="24">擊球：這一幀穿過擊球面</text>
   <rect class="pad" x="380" y="50" width="24" height="192"/>
   <line class="face" x1="404" y1="40" x2="404" y2="252"/>
-  <text class="m" x="410" y="268">HIT_L_X = 40</text>
+  <text class="m" x="410" y="268">HIT_L_X = 44</text>
 
   <rect class="ball" x="470" y="90" width="24" height="24"/>
   <text class="l" x="502" y="98">這一幀的 ball_x</text>
@@ -82,5 +82,5 @@
   <line class="e" x1="432" y1="208" x2="490" y2="208" marker-end="url(#a)"/>
   <text class="l" x="500" y="204">拉回 ball_x ← HIT_L_X</text>
   <text class="l" x="500" y="220">反向、vy ← BOUNCE_VY(zone)</text>
-  <text class="l" x="360" y="284">只看重疊會漏判：一幀最多走 12 像素，比球拍寬 8 像素還多</text>
+  <text class="l" x="360" y="284">只看重疊：球一幀走 12 像素，可能陷進球拍才判到</text>
 </svg>

@@ -2,6 +2,7 @@
 ## 板子：e-elements EGO-XZ7（xc7z020clg484-1）
 ## 時脈、按鈕、開關、LED 取自 Vivado board file：data/boards/board_files/EGO-XZ7/1.1/part0_pins.xml
 ## board file 沒有 HDMI：HDMI 腳位取自《EGO-XZ7 硬體手冊》V1.2 表 14，與 HW3/constraints/HW_3.xdc 相同
+## PS 的 DDR、MIO（USB0、UART1、SD…）由 PS7 IP 的設定決定，不在這裡指定
 
 ## 系統時脈 100 MHz；像素率 = 100 MHz / PIX_DIV（預設 4，25 MHz）
 set_property -dict { PACKAGE_PIN Y9  IOSTANDARD LVCMOS33 } [get_ports clk]
@@ -9,14 +10,14 @@ create_clock -period 10.000 -name sys_clk -waveform {0.000 5.000} [get_ports clk
 
 ## 按鈕：按下為高電位（BTN_ACTIVE_LOW = false）；BTNU（T18）、BTND（R16）不使用
 set_property -dict { PACKAGE_PIN P16 IOSTANDARD LVCMOS25 } [get_ports reset]      ;# BTNC
-set_property -dict { PACKAGE_PIN N15 IOSTANDARD LVCMOS25 } [get_ports btn_l]      ;# BTNL 左球拍
-set_property -dict { PACKAGE_PIN R18 IOSTANDARD LVCMOS25 } [get_ports btn_r]      ;# BTNR 右球拍
+set_property -dict { PACKAGE_PIN N15 IOSTANDARD LVCMOS25 } [get_ports btn_l]      ;# BTNL 左方發球（同鍵盤 D）
+set_property -dict { PACKAGE_PIN R18 IOSTANDARD LVCMOS25 } [get_ports btn_r]      ;# BTNR 右方發球（同鍵盤 ←）
 
 ## 開關：撥上為高電位
 set_property -dict { PACKAGE_PIN F22 IOSTANDARD LVCMOS25 } [get_ports sw_speed]   ;# SW0 起始球速
 
 ## LED：高電位點亮（LED_ACTIVE_LOW = false）
-## SERVE / PLAY：LD0 = SW0、LD6 = ADV7511 設定成功、LD7 = 心跳；POINT / OVER：分數長條
+## SERVE / PLAY：LD0 = SW0、LD1 = 鍵盤已連線、LD2 = PS 心跳、LD6 = ADV7511 設定成功、LD7 = 心跳；POINT / OVER：分數長條
 set_property -dict { PACKAGE_PIN T22 IOSTANDARD LVCMOS33 } [get_ports {led[0]}]   ;# LD0
 set_property -dict { PACKAGE_PIN T21 IOSTANDARD LVCMOS33 } [get_ports {led[1]}]   ;# LD1
 set_property -dict { PACKAGE_PIN U22 IOSTANDARD LVCMOS33 } [get_ports {led[2]}]   ;# LD2

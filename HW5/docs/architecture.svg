@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 470" width="800" height="470" role="img" aria-label="HW5 HDMI 乒乓球架構圖：上排視訊路徑，像素致能 → 視訊時序 → 畫面合成 → HDMI 輸出級 → ADV7511；下排遊戲路徑，BTNL、BTNR、SW0 → 按鈕介面 → HW_5_game（每幀更新）→ 物件座標交給畫面合成，並驅動 LED">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 470" width="800" height="470" role="img" aria-label="HW5 HDMI 乒乓球架構圖：上排視訊路徑，像素致能 → 視訊時序 → 畫面合成 → HDMI 輸出級 → ADV7511；下排遊戲路徑，USB 鍵盤經 PS 的 AXI GPIO、BTNL、BTNR、SW0 → 輸入處理 → HW_5_game（每幀更新）→ 物件座標交給畫面合成，並驅動 LED">
   <style>
     .box { fill: #f6f8fa; stroke: #8c959f; stroke-width: 1.2; }
     .reuse { fill: #dafbe1; stroke: #1a7f37; stroke-width: 1.2; }
@@ -47,17 +47,17 @@
   <line class="e" x1="665" y1="96" x2="665" y2="138" marker-end="url(#a)"/>
 
   <!-- 下排：遊戲路徑 -->
-  <rect class="box" x="20" y="240" width="120" height="44" rx="6"/>
-  <text class="t" x="80" y="267">BTNL 左球拍</text>
+  <rect class="new" x="20" y="240" width="120" height="44" rx="6"/>
+  <text class="t" x="80" y="267">⑩ PS 讀鍵盤</text>
   <rect class="box" x="20" y="300" width="120" height="44" rx="6"/>
-  <text class="t" x="80" y="327">BTNR 右球拍</text>
+  <text class="t" x="80" y="327">BTNL / BTNR</text>
   <rect class="box" x="20" y="360" width="120" height="44" rx="6"/>
   <text class="t" x="80" y="387">SW0 起始球速</text>
 
   <rect class="reuse" x="170" y="230" width="150" height="180" rx="6"/>
-  <text class="t" x="245" y="296">③ HW_5_btn ×2</text>
-  <text class="s" x="245" y="318">同步・去彈跳</text>
-  <text class="m" x="245" y="338" text-anchor="middle">press、held</text>
+  <text class="t" x="245" y="296">③ 輸入處理</text>
+  <text class="s" x="245" y="318">kbd 同步・按鈕去彈跳</text>
+  <text class="m" x="245" y="338" text-anchor="middle">上下鍵・發球脈衝</text>
   <text class="s" x="245" y="370">SW0 兩級同步</text>
 
   <line class="e" x1="140" y1="262" x2="168" y2="262" marker-end="url(#a)"/>

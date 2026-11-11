@@ -2,8 +2,9 @@ library IEEE;
 use IEEE.STD_LOGIC_1164.ALL;
 use IEEE.NUMERIC_STD.ALL;
 
--- HW5 遊戲邏輯測試檔（驗證計畫見 HW5/SPEC.md §13.1）
---   直接例化 HW_5_game，每 4 個 clk 送一個 frame_tick（不用真的掃一幀），按鍵直接驅動 press / held。
+-- HW5 遊戲邏輯測試檔（驗證計畫見 HW5/SPEC.md §14.1）
+--   直接例化 HW_5_game，每 4 個 clk 送一個 frame_tick（不用真的掃一幀），直接驅動發球鍵的按下脈衝
+--   press_l / press_r 與鍵盤上下鍵的電位 up_l、dn_l、up_r、dn_r。
 --   ref_model 依 SPEC §5、§7 自己算一份遊戲狀態，每幀與 DUT 的輸出逐項比對。
 --   前半段是定向測試（reset、球拍、只有發球方能發球、起始球速），後半段兩支球拍自動追球對打，
 --   並統計擊球的 8 個 zone、撞牆、加速到上限、左右失分、OVER、重新開局都有出現。
@@ -28,16 +29,17 @@ architecture sim of HW_5_game_tb is
     constant N_RALLY  : positive := 30000;    -- 自動對打的幀數
 
     -- 畫面配置（SPEC §4.1）
-    constant PAD_H      : integer := 64;
+    constant PAD_H      : integer := 96;      -- 球拍 12 × 96
     constant PAD_Y_MIN  : integer := 8;
-    constant PAD_Y_MAX  : integer := 408;
-    constant PAD_Y_INIT : integer := 208;
-    constant BALL       : integer := 8;
+    constant PAD_Y_MAX  : integer := 376;     -- 472 − 96
+    constant PAD_Y_INIT : integer := 192;
+    constant BALL       : integer := 12;      -- 球 12 × 12
     constant BALL_Y_MIN : integer := 8;
-    constant BALL_Y_MAX : integer := 464;
-    constant HIT_L_X    : integer := 40;
-    constant HIT_R_X    : integer := 592;
-    constant OUT_R_X    : integer := 632;
+    constant BALL_Y_MAX : integer := 460;     -- 472 − 12
+    constant HIT_L_X    : integer := 44;      -- 左球拍 32 ~ 44 的右緣
+    constant HIT_R_X    : integer := 584;     -- 右球拍 596 ~ 608 的左緣減球寬
+    constant OUT_R_X    : integer := 628;     -- 640 − 12
+    constant SERVE_DY   : integer := 42;      -- (96 − 12) / 2
 
     type int8_t is array (0 to 7) of integer;
     constant BOUNCE_VY : int8_t := (-4, -3, -2, -1, 1, 2, 3, 4);
@@ -49,8 +51,10 @@ architecture sim of HW_5_game_tb is
     signal frame_tick : std_logic := '0';
     signal press_l    : std_logic := '0';
     signal press_r    : std_logic := '0';
-    signal held_l     : std_logic := '0';
-    signal held_r     : std_logic := '0';
+    signal up_l       : std_logic := '0';    -- 鍵盤電位：W、S、↑、↓
+    signal dn_l       : std_logic := '0';
+    signal up_r       : std_logic := '0';
+    signal dn_r       : std_logic := '0';
     signal sw_speed   : std_logic := '0';
 
     signal phase      : integer range 0 to 3;
@@ -91,7 +95,7 @@ begin
             BLINK_HALF_FRAMES => HALF, SCORE_SHOW_FRAMES => SHOW)
         port map (
             clk => clk, reset => reset, frame_tick => frame_tick,
-            press_l => press_l, press_r => press_r, held_l => held_l, held_r => held_r,
+            press_l => press_l, press_r => press_r, up_l => up_l, dn_l => dn_l, up_r => up_r, dn_r => dn_r,
             sw_speed => sw_speed,
             phase => phase, server => server, ball_x => ball_x, ball_y => ball_y,
             pad_l_y => pad_l_y, pad_r_y => pad_r_y, score_l => score_l, score_r => score_r,
@@ -111,7 +115,6 @@ begin
         alias d_spd     is << signal .HW_5_game_tb.dut.spd     : integer >>;
         alias d_vy      is << signal .HW_5_game_tb.dut.vy      : integer >>;
         alias d_to_left is << signal .HW_5_game_tb.dut.to_left : std_logic >>;
-
         variable st, srv, wcnt          : integer;   -- st: 0 SERVE、1 PLAY、2 POINT、3 OVER；srv: 1 = 左
         variable req_l, req_r           : boolean;
         variable any_l, any_r           : boolean;
@@ -141,7 +144,7 @@ begin
         begin
             st := 0; srv := 1; wcnt := 0; req_l := false; req_r := false;
             pl := PAD_Y_INIT; pr := PAD_Y_INIT; tl := 0;
-            spd := V_SLOW; hits := 0; vy := 0; bx := HIT_L_X; by := PAD_Y_INIT + 28;
+            spd := V_SLOW; hits := 0; vy := 0; bx := HIT_L_X; by := PAD_Y_INIT + SERVE_DY;
             sl := 0; sr := 0; bcnt := 0; blink := 1; fcnt := 0;
         end procedure;
 
@@ -189,9 +192,9 @@ begin
                 case st is
                     when 0 =>                                       -- SERVE：球黏在發球方球拍
                         if srv = 1 then
-                            bx := HIT_L_X; by := pl + 28;
+                            bx := HIT_L_X; by := pl + SERVE_DY;
                         else
-                            bx := HIT_R_X; by := pr + 28;
+                            bx := HIT_R_X; by := pr + SERVE_DY;
                         end if;
                         if (srv = 1 and any_l) or (srv = 0 and any_r) then
                             n_st := 1;
@@ -216,8 +219,8 @@ begin
                                   (tl = 0 and bx <= HIT_R_X and nx > HIT_R_X);
                         outx   := (tl = 1 and nx <= 0) or (tl = 0 and nx >= OUT_R_X);
                         if cr and over_l then                       -- 擊球
-                            zr := ny + 4 - prx;
-                            if zr < 0 then zone := 0; elsif zr > 63 then zone := 7; else zone := zr / 8; end if;
+                            zr := ny + BALL / 2 - prx;      -- 球的中心，每段 12 像素
+                            if zr < 0 then zone := 0; elsif zr > 95 then zone := 7; else zone := zr / 12; end if;
                             c_zone(zone) := c_zone(zone) + 1;
                             if spd = V_MAX then c_vmax := c_vmax + 1; end if;
                             if tl = 1 then bx := HIT_L_X; else bx := HIT_R_X; end if;
@@ -270,10 +273,10 @@ begin
                     end if;
                 end if;
 
-                -- 球拍：按住往上、放開往下（SPEC §5.1）
-                if held_l = '1' then pl := pl - SPEED; else pl := pl + SPEED; end if;
+                -- 球拍：按住上鍵往上、按住下鍵往下，都沒按或同時按就不動（SPEC §5.1）
+                if up_l = '1' and dn_l = '0' then pl := pl - SPEED; elsif dn_l = '1' and up_l = '0' then pl := pl + SPEED; end if;
                 if pl < PAD_Y_MIN then pl := PAD_Y_MIN; elsif pl > PAD_Y_MAX then pl := PAD_Y_MAX; end if;
-                if held_r = '1' then pr := pr - SPEED; else pr := pr + SPEED; end if;
+                if up_r = '1' and dn_r = '0' then pr := pr - SPEED; elsif dn_r = '1' and up_r = '0' then pr := pr + SPEED; end if;
                 if pr < PAD_Y_MIN then pr := PAD_Y_MIN; elsif pr > PAD_Y_MAX then pr := PAD_Y_MAX; end if;
 
                 fcnt := (fcnt + 1) mod 256;
@@ -307,13 +310,13 @@ begin
 
         variable errors : natural := 0;
         variable seed   : natural := 12345;
-        variable aim_l  : integer := 32;     -- 球拍要對準球中心的哪個位置（0 ~ 63）
-        variable aim_r  : integer := 32;
+        variable aim_l  : integer := 48;     -- 球拍要對準球中心的哪個位置（0 ~ 95）
+        variable aim_r  : integer := 48;
         variable lazy   : boolean := false;  -- 這一趟接球方不追球（製造失分）
         variable last_tl: std_logic := '0';
         variable wait_n : integer := 0;
         variable at_l, at_r : integer;
-        variable target : integer;
+        variable want_l, want_r : integer;
         variable p0     : integer;
 
         procedure check(cond : boolean; msg : string) is
@@ -330,8 +333,20 @@ begin
             return seed mod n;
         end function;
 
+        -- 讓球拍上緣靠近 target：−1 往上、+1 往下、0 停；差超過 3 像素才移動，避免每幀來回抖
+        function steer(pad, target : integer) return integer is
+        begin
+            if pad > target + 3 then
+                return -1;
+            elsif pad < target - 3 then
+                return 1;
+            else
+                return 0;
+            end if;
+        end function;
+
         -- 一幀 = 4 個 clk，第一個 clk 送 frame_tick；
-        --   pl_at / pr_at：按下脈衝放在第幾個 clk（0 = 和 frame_tick 同一拍，−1 = 不按）
+        --   pl_at / pr_at：發球鍵的按下脈衝放在第幾個 clk（0 = 和 frame_tick 同一拍，−1 = 不按）
         procedure frame(pl_at, pr_at : integer) is
         begin
             for k in 0 to 3 loop
@@ -353,6 +368,20 @@ begin
             end loop;
         end procedure;
 
+        -- 上下鍵：want −1 按上、+1 按下、0 都放開；偶爾兩個一起按（應該不動）
+        procedure keys(want : integer; both : boolean; signal up, dn : out std_logic) is
+        begin
+            if both then
+                up <= '1'; dn <= '1';
+            elsif want < 0 then
+                up <= '1'; dn <= '0';
+            elsif want > 0 then
+                up <= '0'; dn <= '1';
+            else
+                up <= '0'; dn <= '0';
+            end if;
+        end procedure;
+
     begin
         wait for 5 * T;
         wait until rising_edge(clk);
@@ -363,74 +392,68 @@ begin
 
         -- 1. Reset：比分 0:0、左發、球拍置中、球黏在左球拍擊球面中央
         check(phase = 0 and server = '1', "reset: SERVE, left serves");
-        check(to_integer(pad_l_y) = 208 and to_integer(pad_r_y) = 208, "reset: paddles centered");
-        check(to_integer(ball_x) = 40 and to_integer(ball_y) = 236, "reset: ball on the left paddle");
+        check(to_integer(pad_l_y) = 192 and to_integer(pad_r_y) = 192, "reset: paddles centered");
+        check(to_integer(ball_x) = 44 and to_integer(ball_y) = 234, "reset: ball on the left paddle");
         check(score_l = 0 and score_r = 0, "reset: score 0:0");
 
-        -- 2. 球拍：按住每幀上移 6，停在 8；放開每幀下移 6，停在 408
-        held_l <= '1';
+        -- 2. 球拍（用右球拍）：按住上鍵每幀上移 6、停在 8；放開停在原地；上下同時按不動；
+        --    按住下鍵停在 376；沒按的左球拍一直不動
+        up_r <= '1';
         frame(-1, -1);
-        check(to_integer(pad_l_y) = 202, "paddle: one frame up = 202");
+        check(to_integer(pad_r_y) = 186, "paddle: one frame up = 186");
         frames(40);
-        check(to_integer(pad_l_y) = 8, "paddle: stops at the top wall");
-        check(to_integer(ball_y) = 8 + 28, "serve: ball follows the left paddle");
-        held_l <= '0';
+        check(to_integer(pad_r_y) = 8, "paddle: stops at the top wall");
+        up_r <= '0';
+        frames(5);
+        check(to_integer(pad_r_y) = 8, "paddle: stays put when no key is held");
+        dn_r <= '1';
+        frame(-1, -1);
+        check(to_integer(pad_r_y) = 14, "paddle: one frame down = 14");
+        up_r <= '1';
+        frames(5);
+        check(to_integer(pad_r_y) = 14, "paddle: up and down together do not move");
+        up_r <= '0';
         frames(80);
-        check(to_integer(pad_l_y) = 408, "paddle: stops at the bottom wall");
-        check(to_integer(pad_r_y) = 408, "paddle: right paddle falls when released");
+        check(to_integer(pad_r_y) = 376, "paddle: stops at the bottom wall");
+        dn_r <= '0';
+        check(to_integer(pad_l_y) = 192, "paddle: the left paddle stays put");
+        check(to_integer(ball_y) = 192 + SERVE_DY, "serve: ball sits at the middle of the left paddle");
 
-        -- 3. 只有發球方能發球：右方按下不影響
-        held_r <= '1';
+        -- 3. 只有發球方能發球：右方按發球鍵不影響
         frame(-1, 2);
-        held_r <= '0';
         frames(2);
         check(phase = 0, "serve: the receiver cannot serve");
 
-        -- 4. SW0 撥上、左方按下（和 frame_tick 同一拍）：進入 PLAY，起始速度 VX_FAST，球往右
+        -- 4. SW0 撥上、左方按發球鍵（和 frame_tick 同一拍）：進入 PLAY，起始速度 VX_FAST，球往右
         sw_speed <= '1';
-        held_l   <= '1';
         frame(0, -1);
         check(phase = 1, "serve: left press starts PLAY");
         check(d_spd = V_FAST and d_to_left = '0', "serve: VX_FAST toward the right");
         p0 := to_integer(ball_x);
         frame(-1, -1);
         check(to_integer(ball_x) = p0 + V_FAST, "serve: ball moves VX_FAST per frame");
-        held_l   <= '0';
         sw_speed <= '0';
 
-        -- 5. 自動對打：接球方的球拍追著球；每 6 趟有一趟不追，製造失分
+        -- 5. 自動對打：接球方的球拍追著球；每 6 趟有一趟不追，製造失分；另一方隨機按
         for i in 1 to N_RALLY loop
-            -- 球拍
-            if phase = 1 then
-                if d_to_left /= last_tl then             -- 換方向：重新挑對準位置
-                    last_tl := d_to_left;
-                    aim_l   := rnd(64);
-                    aim_r   := rnd(64);
-                    lazy    := rnd(6) = 0;
-                end if;
-                if d_to_left = '1' and not lazy then
-                    target := to_integer(ball_y) + 4 - aim_l;
-                    if to_integer(pad_l_y) > target then held_l <= '1'; else held_l <= '0'; end if;
-                else
-                    if rnd(2) = 0 then held_l <= '1'; else held_l <= '0'; end if;
-                end if;
-                if d_to_left = '0' and not lazy then
-                    target := to_integer(ball_y) + 4 - aim_r;
-                    if to_integer(pad_r_y) > target then held_r <= '1'; else held_r <= '0'; end if;
-                else
-                    if rnd(2) = 0 then held_r <= '1'; else held_r <= '0'; end if;
-                end if;
-            else
-                if rnd(2) = 0 then held_l <= '1'; else held_l <= '0'; end if;
-                if rnd(2) = 0 then held_r <= '1'; else held_r <= '0'; end if;
+            if phase = 1 and d_to_left /= last_tl then   -- 換方向：重新挑對準位置
+                last_tl := d_to_left;
+                aim_l   := rnd(96);
+                aim_r   := rnd(96);
+                lazy    := rnd(6) = 0;
             end if;
 
-            -- SW0 偶爾撥動（只在發球時生效）
-            if rnd(200) = 0 then
-                sw_speed <= not sw_speed;
+            want_l := rnd(3) - 1;
+            want_r := rnd(3) - 1;
+            if phase = 1 and d_to_left = '1' and not lazy then
+                want_l := steer(to_integer(pad_l_y), to_integer(ball_y) + BALL / 2 - aim_l);
+            elsif phase = 1 and d_to_left = '0' and not lazy then
+                want_r := steer(to_integer(pad_r_y), to_integer(ball_y) + BALL / 2 - aim_r);
             end if;
+            keys(want_l, rnd(50) = 0, up_l, dn_l);
+            keys(want_r, rnd(50) = 0, up_r, dn_r);
 
-            -- 按鍵：SERVE、OVER 中等幾幀後按下；其他狀態偶爾亂按（應被忽略）
+            -- 發球鍵：SERVE、OVER 中等幾幀後按下；其他時候偶爾亂按（應被忽略）
             at_l := -1;
             at_r := -1;
             if phase = 0 or phase = 3 then
@@ -439,18 +462,21 @@ begin
                 end if;
                 wait_n := wait_n - 1;
                 if wait_n = 0 then
-                    if phase = 3 and rnd(2) = 0 then
+                    if (phase = 3 and rnd(2) = 0) or (phase = 0 and server = '0') then
                         at_r := rnd(4);
-                    elsif phase = 3 or server = '1' then
-                        at_l := rnd(4);
                     else
-                        at_r := rnd(4);
+                        at_l := rnd(4);
                     end if;
                 elsif rnd(8) = 0 then
                     if server = '1' then at_r := rnd(4); else at_l := rnd(4); end if;   -- 非發球方亂按
                 end if;
             elsif rnd(30) = 0 then
                 at_l := rnd(4);
+            end if;
+
+            -- SW0 偶爾撥動（只在發球時生效）
+            if rnd(200) = 0 then
+                sw_speed <= not sw_speed;
             end if;
 
             frame(at_l, at_r);

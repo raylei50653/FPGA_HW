@@ -3,13 +3,14 @@ use IEEE.STD_LOGIC_1164.ALL;
 use IEEE.NUMERIC_STD.ALL;
 use STD.TEXTIO.ALL;
 
--- HW5 HDMI 乒乓球整體測試檔（驗證計畫見 HW5/SPEC.md §13.2）
---   例化 HW_5，PIX_DIV = 2（像素輸出與 4 相同，模擬快一倍），去彈跳與 ADV7511 設定等待縮短，跑 3 幀：
+-- HW5 HDMI 乒乓球整體測試檔（驗證計畫見 HW5/SPEC.md §14.2）
+--   例化 PL 部分 HW_5_pong（PS 與 block design 不模擬，鍵盤狀態 kbd 由測試檔直接給），
+--   PIX_DIV = 2（像素輸出與 4 相同，模擬快一倍），去彈跳與 ADV7511 設定等待縮短，跑 3 幀：
 --     1. 同步時序：hs 寬 96 像素、週期 800 像素；vs 寬 2 行、週期 525 行（全程）
 --     2. 畫面：RGB888 串流的每個可視像素 = 測試檔依 SPEC §4 畫的參考畫面（用 top 層的物件座標與分數）
 --     3. 4:2:2：每對像素（偶、奇）顏色相同，也就是物件的 x 邊界都是偶數
 --     4. 不撕裂：遊戲座標只在 y >= 480（垂直遮沒）時改變
---     5. 按鈕：按住 BTNL 後下一幀左球拍上移，左方發球進入 PLAY
+--     5. 鍵盤與按鈕：按住 W 時左球拍每幀上移、放開就停；按 BTNL 發球進入 PLAY；LD1、LD2 跟著 kbd(6)、kbd(7)
 --     6. HDMI：腳位上的 YCbCr 4:2:2 = 串流轉換的結果；像素時脈週期與相位正確
 --     7. ADV7511：I2C 從端模型收下設定，檢查重點暫存器；LD6 亮
 --   畫面存成 PPM（frame_serve.ppm、frame_play.ppm）。需以 VHDL 2008 編譯，最後印出 PASS / FAIL
@@ -68,11 +69,11 @@ architecture Behavioral of HW_5_tb is
     begin
         show_l := not (ph >= 2 and srv = '1' and blink = '0');
         show_r := not (ph >= 2 and srv = '0' and blink = '0');
-        if ph <= 1 and in_rect(x, y, bx, by, 8, 8) then
+        if ph <= 1 and in_rect(x, y, bx, by, 12, 12) then
             return x"FFFFFF";                                       -- 球
-        elsif in_rect(x, y, 32, pl, 8, 64) then
+        elsif in_rect(x, y, 32, pl, 12, 96) then
             return x"FF8000";                                       -- 左球拍
-        elsif in_rect(x, y, 600, pr, 8, 64) then
+        elsif in_rect(x, y, 596, pr, 12, 96) then
             return x"00C0FF";                                       -- 右球拍
         elsif show_l and digit_hit(x, y, 256, 24, sl) then
             return x"FF8000";                                       -- 左分數
@@ -108,6 +109,7 @@ architecture Behavioral of HW_5_tb is
     signal btn_l     : std_logic := '0';
     signal btn_r     : std_logic := '0';
     signal sw_speed  : std_logic := '0';
+    signal kbd       : std_logic_vector(7 downto 0) := (others => '0');   -- PS 給的按鍵狀態（SPEC §12.3）
     signal led       : std_logic_vector(7 downto 0);
     signal hdmi_clk  : std_logic;
     signal hdmi_d    : std_logic_vector(23 downto 0);
@@ -129,10 +131,10 @@ architecture Behavioral of HW_5_tb is
 
 begin
 
-    dut : entity work.HW_5
+    dut : entity work.HW_5_pong
         generic map (PIX_DIV => PIX_DIV, DEBOUNCE_CYCLES => DB, HDMI_CFG_DELAY => CFG_DELAY)
         port map (
-            clk => clk, reset => reset, btn_l => btn_l, btn_r => btn_r, sw_speed => sw_speed,
+            clk => clk, reset => reset, btn_l => btn_l, btn_r => btn_r, sw_speed => sw_speed, kbd => kbd,
             hdmi_clk => hdmi_clk, hdmi_d => hdmi_d, hdmi_hs => hdmi_hs, hdmi_vs => hdmi_vs,
             hdmi_scl => hdmi_scl, hdmi_sda => hdmi_sda, led => led);
 
@@ -411,21 +413,29 @@ begin
         wait for 10 * T;
         reset <= '0';
 
-        -- 1. SERVE：球黏在左球拍上，兩支球拍往下掉
+        -- 1. SERVE：球黏在左球拍上，沒按鍵時球拍不動
         capture("frame_serve", true);
         check(phase = 0, "first frame should be SERVE");
+        check(to_integer(pad_l_y) = 192 and to_integer(pad_r_y) = 192, "paddles should stay put without keys");
 
-        -- 2. 按住 BTNL：下一幀左球拍上移，左方發球進入 PLAY
-        pl0   := to_integer(pad_l_y);
-        btn_l <= '1';
+        -- 2. 按住 W（kbd(0)）、按 BTNL：下一幀左球拍上移，左方發球進入 PLAY
+        pl0    := to_integer(pad_l_y);
+        kbd(0) <= '1';
+        btn_l  <= '1';
         capture("frame_1", false);
-        check(phase = 1, "left press should start PLAY");
-        check(to_integer(pad_l_y) < pl0, "holding BTNL should move the left paddle up");
-        btn_l <= '0';
+        check(phase = 1, "BTNL should serve");
+        check(to_integer(pad_l_y) < pl0, "holding W should move the left paddle up");
+        btn_l  <= '0';
+        kbd(0) <= '0';
+        pl0    := to_integer(pad_l_y);
 
-        -- 3. PLAY：球離開球拍
+        -- 3. PLAY：球離開球拍；放開 W 後球拍停住
         capture("frame_play", true);
-        check(to_integer(ball_x) > 40, "ball should leave the left paddle");
+        check(to_integer(ball_x) > 44, "ball should leave the left paddle");
+        check(to_integer(pad_l_y) = pl0, "the left paddle should stop after W is released");
+        kbd(6) <= '1';                 -- 鍵盤已連線、PS 心跳
+        kbd(7) <= '1';
+        wait for 100 * T;
 
         done <= true;
         wait for 1 us;
@@ -451,6 +461,7 @@ begin
         check(hdmi_ok = '1' and led(6) = '1', "LD6 should show the ADV7511 configuration succeeded");
         check(led(0) = sw_speed, "LD0 should follow SW0");
         check(led(7) = heartbeat, "LD7 should be the heartbeat");
+        check(led(1) = '1' and led(2) = '1', "LD1 / LD2 should follow kbd(6) / kbd(7)");
 
         if errors = 0 then
             report "HW_5_tb PASS";
